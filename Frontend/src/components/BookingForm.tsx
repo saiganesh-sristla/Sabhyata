@@ -104,7 +104,7 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
 
   const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL ||
-    "https://sabhyata-foundation.onrender.com";
+    "https://sabhyata.onrender.com";
   const token = localStorage.getItem("token");
 
   const isInactive = eventData?.status === "inactive";

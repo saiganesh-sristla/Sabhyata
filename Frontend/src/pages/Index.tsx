@@ -10,7 +10,7 @@ import {
 const token = localStorage.getItem("token");
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  "https://sabhyata-foundation.onrender.com";
+  "https://sabhyata.onrender.com";
 
 // Skeleton Component
 const MonumentSkeleton = () => (

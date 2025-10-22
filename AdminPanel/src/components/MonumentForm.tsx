@@ -35,7 +35,7 @@ function MonumentForm() {
         setLoading(true);
         try {
           const res = await fetch(
-            `https://sabhyata-foundation.onrender.com/api/admin/monuments/${id}`,
+            `https://sabhyata.onrender.com/api/admin/monuments/${id}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -137,8 +137,8 @@ function MonumentForm() {
     };
     const method = isEdit ? "PUT" : "POST";
     const url = isEdit
-      ? `https://sabhyata-foundation.onrender.com/api/admin/monuments/${id}`
-      : `https://sabhyata-foundation.onrender.com/api/admin/monuments`;
+      ? `https://sabhyata.onrender.com/api/admin/monuments/${id}`
+      : `https://sabhyata.onrender.com/api/admin/monuments`;
 
     try {
       const res = await fetch(url, {

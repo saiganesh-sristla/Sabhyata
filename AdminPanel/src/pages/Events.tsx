@@ -309,7 +309,7 @@ const Events = () => {
             >
               <div className="relative">
                 <img
-                  src={`https://sabhyata-foundation.onrender.com/${event.thumbnail}`}
+                  src={`https://sabhyata.onrender.com/${event.thumbnail}`}
                   alt={event.name}
                   className="w-full h-48 object-cover"
                   crossOrigin="anonymous"

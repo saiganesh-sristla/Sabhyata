@@ -57,7 +57,7 @@ export default function BookingPaymentForm() {
   const [deviceId, setDeviceId] = useState(null);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sabhyata-foundation.onrender.com/api";
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sabhyata.onrender.com/api";
   
   // ✅ Check if this is a walking tour
 const isWalkingTour = searchParams.has('eventId');
@@ -535,7 +535,7 @@ useEffect(() => {
             <img
               src={
                 bookingData.event.images && bookingData.event.images.length > 0
-                  ? `https://sabhyata-foundation.onrender.com/${bookingData.event.images[0].replace(/\\/g, '/')}`
+                  ? `https://sabhyata.onrender.com/${bookingData.event.images[0].replace(/\\/g, '/')}`
                   : "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=300&h=200&fit=crop"
               }
               alt={bookingData.event.name}

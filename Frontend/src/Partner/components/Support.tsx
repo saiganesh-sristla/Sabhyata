@@ -120,14 +120,14 @@ const faqs = [
             <div className="bg-white p-6 rounded-lg border">
               <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
               <div className="grid md:grid-cols-3 gap-4">
-                <a href="https://sabhyata-foundation.onrender.com/api/docs/" target='_blank' className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
+                <a href="https://sabhyata.onrender.com/api/docs/" target='_blank' className="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
                   <Book className="text-[#982A3D] mr-3" size={20} />
                   <div>
                     <div className="font-medium text-[#982A3D]">API Docs</div>
                     <div className="text-xs text-[#982A3D]">Complete reference</div>
                   </div>
                 </a>
-                <a href="https://sabhyata-foundation.onrender.com/api/health" target='_blank' className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition-colors">
+                <a href="https://sabhyata.onrender.com/api/health" target='_blank' className="flex items-center p-3 bg-green-50 rounded-lg border border-green-200 hover:bg-green-100 transition-colors">
                   <CheckCircle className="text-green-600 mr-3" size={20} />
                   <div>
                     <div className="font-medium text-green-900">Status</div>
@@ -233,7 +233,7 @@ const faqs = [
                   <span className="text-sm font-medium text-gray-900">99.9%</span>
                 </div>
                 <a 
-                  href="https://sabhyata-foundation.onrender.com/api/health" target='_blank' rel='noreferrer'
+                  href="https://sabhyata.onrender.com/api/health" target='_blank' rel='noreferrer'
                   className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800 mt-2">
                   View status page
                   <ExternalLink size={14} className="ml-1" />

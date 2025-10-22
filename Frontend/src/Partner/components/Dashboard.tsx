@@ -349,7 +349,7 @@ const Dashboard = ({ sessionToken }) => {
             {/* <div className="bg-white p-6 rounded-lg border">
               <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>
               <div className="space-y-3">
-                <a href="https://sabhyata-foundation.onrender.com/api/docs/" target='_blank'><button className="w-full flex items-center p-3 text-left bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
+                <a href="https://sabhyata.onrender.com/api/docs/" target='_blank'><button className="w-full flex items-center p-3 text-left bg-blue-50 rounded-lg border border-blue-200 hover:bg-blue-100 transition-colors">
                   <Eye className="text-blue-600 mr-3" size={18} />
                   <div>
                     <div className="font-medium text-blue-900">View API Docs</div>

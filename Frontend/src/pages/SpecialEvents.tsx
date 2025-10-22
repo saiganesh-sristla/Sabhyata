@@ -71,7 +71,7 @@ const Carousel = ({ media, apiBaseUrl, isSpecial }) => {
         >
           {item.type === "image" ? (
             <img
-              src={`https://sabhyata-foundation.onrender.com/${item.url}`}
+              src={`https://sabhyata.onrender.com/${item.url}`}
               alt={`Slide ${index}`}
               className="w-full h-full object-cover"
               crossOrigin="anonymous"
@@ -108,7 +108,7 @@ const SpecialEvent = () => {
   const [event, setEvent] = useState(null);
   const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL ||
-    "https://sabhyata-foundation.onrender.com";
+    "https://sabhyata.onrender.com";
   const token = localStorage.getItem("token");
 
   useEffect(() => {

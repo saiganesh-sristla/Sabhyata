@@ -247,7 +247,7 @@ const EventForm = () => {
         const images = event.images || [];
         const prefixedImages = images.map(
           (imageUrl: string) =>
-            `https://sabhyata-foundation.onrender.com/${imageUrl}`
+            `https://sabhyata.onrender.com/${imageUrl}`
         );
         setPreviewImages(prefixedImages);
         setExistingPaths(images);

@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API_BASE_URL =
   ((import.meta as any).env?.VITE_API_BASE_URL) ||
-  "https://sabhyata-foundation.onrender.com/api";
+  "https://sabhyata.onrender.com/api";
 
 // Create axios instance
 const apiClient = axios.create({

@@ -13,7 +13,7 @@ function MonumentDetails() {
     const fetchMonument = async () => {
       try {
         const res = await fetch(
-          `https://sabhyata-foundation.onrender.com/api/admin/monuments/${id}`,
+          `https://sabhyata.onrender.com/api/admin/monuments/${id}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

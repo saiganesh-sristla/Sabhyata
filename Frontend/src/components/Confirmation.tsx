@@ -27,7 +27,7 @@ export default function BookingConfirmation() {
 
   const API_URL =
     import.meta.env.VITE_API_BASE_URL ||
-    "https://sabhyata-foundation.onrender.com/api";
+    "https://sabhyata.onrender.com/api";
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -443,7 +443,7 @@ export default function BookingConfirmation() {
               <img
                 src={
                   bookingData?.event?.images?.[0]
-                    ? `https://sabhyata-foundation.onrender.com/${bookingData.event.images[0]}`
+                    ? `https://sabhyata.onrender.com/${bookingData.event.images[0]}`
                     : "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=80&h=80&fit=crop"
                 }
                 alt={eventName}

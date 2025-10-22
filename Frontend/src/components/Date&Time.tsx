@@ -33,7 +33,7 @@ export const DateTimeSelection = () => {
 
   const API_URL =
     import.meta.env.VITE_API_BASE_URL ||
-    "https://sabhyata-foundation.onrender.com/api";
+    "https://sabhyata.onrender.com/api";
 
   const languageMap: { [key: string]: string } = {
     en: "English",

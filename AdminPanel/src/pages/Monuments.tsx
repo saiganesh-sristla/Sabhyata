@@ -22,7 +22,7 @@ function Monuments() {
 
   const fetchMonuments = async () => {
     setLoading(true);
-    let url = `https://sabhyata-foundation.onrender.com/api/admin/monuments?page=${page}&limit=${limit}`;
+    let url = `https://sabhyata.onrender.com/api/admin/monuments?page=${page}&limit=${limit}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (status) url += `&status=${status}`;
 
@@ -64,7 +64,7 @@ function Monuments() {
   const confirmDelete = async () => {
     try {
       const res = await fetch(
-        `https://sabhyata-foundation.onrender.com/api/admin/monuments/${deleteId}`,
+        `https://sabhyata.onrender.com/api/admin/monuments/${deleteId}`,
         {
           method: "DELETE",
           headers: {

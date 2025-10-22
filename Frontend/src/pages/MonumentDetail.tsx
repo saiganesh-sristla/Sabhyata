@@ -7,7 +7,7 @@ import {
 const token = localStorage.getItem("token");
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  "https://sabhyata-foundation.onrender.com";
+  "https://sabhyata.onrender.com";
 
 function MonumentDetail() {
   const { id } = useParams();
@@ -90,7 +90,7 @@ function MonumentDetail() {
             {event.thumbnail && (
               <div className="relative w-full md:w-1/2">
                 <img
-                  src={`https://sabhyata-foundation.onrender.com/${event.thumbnail}`}
+                  src={`https://sabhyata.onrender.com/${event.thumbnail}`}
                   alt={event.name}
                   className="w-full h-64 md:h-full object-cover"
                   crossOrigin="anonymous"
