@@ -1,0 +1,176 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Minion Pro - font-minion */ 
+@font-face {
+  font-family: 'Minion Pro';
+  src: url('/src/assets/fonts/MinionPro-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Minion Pro';
+  src: url('/src/assets/fonts/MinionPro-SemiBold.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Minion Pro';
+  src: url('/src/assets/fonts/MinionPro-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+/* Helvetica - font-helvetica  */
+@font-face {
+  font-family: 'Helvetica';
+  src: url('/src/assets/fonts/Helvetica-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Helvetica';
+  src: url('/src/assets/fonts/Helvetica-SemiBold.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'Helvetica';
+  src: url('/src/assets/fonts/Helvetica-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+body {
+  @apply font-helvetica;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  @apply font-minion;
+}
+
+
+/* Heritage Monument Booking Platform Design System */
+
+@layer base {
+  :root {
+    /* Base Colors */
+    --background: 0 0% 100%;
+    --foreground: 220 13% 18%;
+
+    /* Card & Surface Colors */
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 18%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 18%;
+
+    /* Heritage Primary Colors - Deep Burgundy */
+    --primary: 355 65% 25%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Heritage Gold Accent */
+    --secondary: 45 95% 55%;
+    --secondary-foreground: 25 45% 15%;
+
+    /* Neutral Tones */
+    --muted: 210 40% 96%;
+    --muted-foreground: 220 13% 46%;
+
+    --accent: 45 20% 92%;
+    --accent-foreground: 220 13% 18%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 355 65% 25%;
+
+    /* Heritage Theme Colors */
+    --heritage-gold: 45 95% 55%;
+    --heritage-copper: 25 85% 45%;
+    --heritage-burgundy: 355 65% 25%;
+    --heritage-cream: 45 30% 95%;
+    
+    /* Special Gradients */
+    --gradient-jai-hind: linear-gradient(135deg, hsl(250 60% 15%), hsl(280 40% 25%), hsl(25 85% 45%));
+    --gradient-heritage: linear-gradient(135deg, hsl(355 65% 25%), hsl(25 85% 45%));
+    --gradient-gold: linear-gradient(135deg, hsl(45 95% 55%), hsl(25 85% 45%));
+    
+    /* Shadows */
+    --shadow-heritage: 0 10px 40px -10px hsl(355 65% 25% / 0.3);
+    --shadow-gold: 0 8px 25px -5px hsl(45 95% 55% / 0.4);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 220 25% 8%;
+    --foreground: 45 30% 95%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 45 30% 95%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 45 30% 95%;
+
+    --primary: 45 95% 55%;
+    --primary-foreground: 25 45% 15%;
+
+    --secondary: 355 65% 25%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 20% 15%;
+    --muted-foreground: 220 13% 65%;
+
+    --accent: 220 20% 15%;
+    --accent-foreground: 45 30% 95%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 20%;
+    --input: 220 20% 20%;
+    --ring: 45 95% 55%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "name": "admin-panel-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Admin panel frontend (Vite + React + TypeScript)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "echo \"Run frontend tests separately\" && exit 0"
+  },
+  "keywords": [
+    "admin-panel",
+    "frontend",
+    "react",
+    "vite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "axios": "^1.12.2",
+    "crypto-js": "^4.2.0",
+    "date-fns": "^3.0.6",
+    "dotenv": "^17.2.2",
+    "html5-qrcode": "^2.3.8",
+    "lucide-react": "^0.344.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.48.2",
+    "react-icons": "^5.5.0",
+    "react-router-dom": "^6.20.1",
+    "react-tooltip": "^5.29.1",
+    "recharts": "^2.8.0",
+    "yup": "^1.3.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.18",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.2"
+  }
+}
