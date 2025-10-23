@@ -1,5 +1,8 @@
 const Event = require('../../models/Event');
 const Monument = require('../../models/Monument');
+const Booking = require('../../models/Booking');
+const SeatLayout = require('../../models/SeatLayout');
+mongoose = require('mongoose');
 
 // Helper function to convert YouTube watch URL to embed URL
 const convertToEmbedUrl = (url) => {
@@ -382,7 +385,6 @@ exports.getEventCategories = async (req, res) => {
 };
 
 // Toggle interest
-// Toggle interest
 exports.toggleInterest = async (req, res) => {
   try {
     const eventId = req.params.id;
@@ -470,5 +472,71 @@ exports.toggleInterest = async (req, res) => {
       message: 'Failed to toggle interest',
       error: error.message
     });
+  }
+};
+
+// Get remaining capacity for an event on a specific date/time/language
+exports.getRemainingCapacity = async (req, res) => {
+  try {
+    const { id: eventId } = req.params;
+    const { date, time, language = '' } = req.query;
+    
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ success: false, message: 'Invalid event ID' });
+    }
+    
+    const event = await Event.findById(eventId);
+    if (!event) {
+      return res.status(404).json({ success: false, message: 'Event not found' });
+    }
+    
+    const queryDate = new Date(date);
+    if (isNaN(queryDate.getTime())) {
+      return res.status(400).json({ success: false, message: 'Invalid date format' });
+    }
+    
+    let remaining;
+    
+    // ✅ Check event type: walking (overall capacity) vs configure (seat-based)
+    const isWalkingEvent = event.type === 'walking' || event.configureSeats === false;
+    const isConfigureEvent = event.type === 'configure' || event.configureSeats === true;
+    
+    if (isWalkingEvent) {
+      // ✅ Walking: Count bookings against overall capacity
+      const query = {
+        event: eventId,
+        date: queryDate,
+        time,
+        ...(language && { language }),
+        $or: [
+          { status: { $in: ['confirmed', 'active'] } },
+          { status: 'pending', expiresAt: { $gt: new Date() } }
+        ]
+      };
+      
+      const bookedCount = await Booking.countDocuments(query);
+      remaining = event.capacity - bookedCount;
+    } else if (isConfigureEvent) {
+      // ✅ Configure: Fetch from SeatLayout and use available_seats
+      const seatLayout = await SeatLayout.findOne({
+        event_id: eventId,
+        date: queryDate,
+        time,
+        language: language || { $exists: false } // Handle empty language as optional
+      });
+      
+      if (!seatLayout) {
+        return res.status(404).json({ success: false, message: 'Seat layout not found for this slot' });
+      }
+      
+      remaining = seatLayout.available_seats; // Direct from response
+    } else {
+      return res.status(400).json({ success: false, message: 'Unsupported event type' });
+    }
+    
+    res.json({ success: true, data: { remaining: Math.max(0, remaining) } });
+  } catch (error) {
+    console.error('Remaining capacity error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };

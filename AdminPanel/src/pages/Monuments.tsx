@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
+import { Edit, Edit2, Eye, Trash2 } from "lucide-react";
 
 // Assume token is stored in localStorage after login
 const token = localStorage.getItem("token"); // Adjust based on your auth setup
@@ -144,7 +145,7 @@ function Monuments() {
           </div>
           <Link
             to="/monuments/new"
-            className="mt-4 md:mt-0 bg-pink-600 text-white px-4 py-2 rounded-md hover:bg-pink-700 transition"
+            className="mt-4 md:mt-0 bg-[#982A3D] text-white px-4 py-2 rounded-md hover:bg-pink-700 transition"
           >
             + Add Monument
           </Link>
@@ -220,7 +221,7 @@ function Monuments() {
         </div>
         <Link
           to="/monuments/new"
-          className="mt-4 md:mt-0 bg-pink-600 text-white px-4 py-2 rounded-md hover:bg-pink-700 transition"
+          className="mt-4 md:mt-0 bg-[#982A3D] text-white px-4 py-2 rounded-md hover:bg-pink-700 transition"
         >
           + Add Monument
         </Link>
@@ -346,24 +347,24 @@ function Monuments() {
                       {stat.text}
                     </span>
                   </td>
-                  <td className="p-6 whitespace-nowrap text-sm font-medium flex gap-4">
+                  <td className="p-6 whitespace-nowrap text-sm font-light flex gap-2">
                     <Link
                       to={`/monuments/${m._id}`}
-                      className="text-indigo-600 hover:text-indigo-900 flex items-center gap-1"
+                      className="text-indigo-600 hover:text-indigo-900 flex items-center "
                     >
-                      <FaEye /> View
+                      <Eye size={16} /> 
                     </Link>
                     <Link
                       to={`/monuments/${m._id}/edit`}
-                      className="text-green-600 hover:text-green-900 flex items-center gap-1"
+                      className="text-green-600 hover:text-green-900 flex items-center"
                     >
-                      <FaEdit /> Edit
+                      <Edit2 size={16} /> 
                     </Link>
                     <button
                       onClick={() => openDeleteModal(m._id)}
-                      className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                      className="text-red-600 hover:text-red-900 flex items-center"
                     >
-                      <FaTrash /> Delete
+                      <Trash2 size={16} /> 
                     </button>
                   </td>
                 </tr>

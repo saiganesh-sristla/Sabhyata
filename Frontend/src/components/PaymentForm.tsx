@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MapPin, Calendar, Clock, Users, Shield, LogIn } from "lucide-react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom"; // ✅ Add useSearchParams
 import { useAuth0 } from "@auth0/auth0-react";
@@ -56,6 +56,7 @@ export default function BookingPaymentForm() {
   const [sessionId, setSessionId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const hasCreatedAbandonedCart = useRef(false); // Flag to ensure only once
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sabhyata.onrender.com/api";
   
@@ -197,6 +198,79 @@ useEffect(() => {
   fetchOrLoadBooking();
 }, [bookingId, isWalkingTour, searchParams, navigate, API_BASE_URL, token]);
 
+  // ✅ Create abandoned cart on load (only once, after bookingData is ready)
+  useEffect(() => {
+    const createAbandonedCart = async () => {
+      if (!bookingData || !sessionId || hasCreatedAbandonedCart.current) return;
+
+      try {
+        // Construct tickets array
+        let tickets = [];
+        if (isWalkingTour) {
+          const adultPrice = bookingData.event.pricing?.adult || 0;
+          const childPrice = bookingData.event.pricing?.child || 0;
+          if (bookingData.adults > 0) {
+            tickets.push({
+              type: 'adult',
+              quantity: bookingData.adults,
+              price: adultPrice
+            });
+          }
+          if (bookingData.children > 0) {
+            tickets.push({
+              type: 'child',
+              quantity: bookingData.children,
+              price: childPrice
+            });
+          }
+        } else {
+          // For seated events, assume bookingData has tickets array or derive from seats
+          // Adjust based on your booking schema - example assuming all adults for seats
+          if (bookingData.seats && bookingData.seats.length > 0) {
+            tickets = [{
+              type: 'adult', // Adjust if seats have types
+              quantity: bookingData.seats.length,
+              price: bookingData.totalAmount / bookingData.seats.length // Approximate per ticket
+            }];
+          } else if (bookingData.tickets) {
+            tickets = bookingData.tickets; // Direct if available
+          }
+        }
+
+        const abandonedCartPayload = {
+          sessionId,
+          event: bookingData.event._id,
+          tickets,
+          totalAmount: bookingData.totalAmount,
+          contactInfo: contactInfo // Initial empty, can be updated later if needed
+        };
+
+        console.log('Creating abandoned cart:', abandonedCartPayload);
+
+        const response = await fetch(`${API_BASE_URL}/abandoned-carts/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // No auth required based on your routes
+          },
+          body: JSON.stringify(abandonedCartPayload)
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          console.log('Abandoned cart created/updated:', data.data._id);
+          hasCreatedAbandonedCart.current = true;
+        } else {
+          console.error('Failed to create abandoned cart:', data.message);
+        }
+      } catch (err) {
+        console.error('Abandoned cart creation error:', err);
+      }
+    };
+
+    createAbandonedCart();
+  }, [bookingData, sessionId, isWalkingTour, contactInfo, API_BASE_URL]);
 
   // Fetch user data and auto-fill
   useEffect(() => {

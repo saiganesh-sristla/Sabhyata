@@ -19,4 +19,4 @@ router.post('/', createAbandonedCart);
 router.post('/:id/reminder', sendReminder);
 router.delete('/:id', deleteAbandonedCart);
 
-module.exports = router;
+module.exports = router; 

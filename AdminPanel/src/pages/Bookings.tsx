@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { adminAPI, downloadFile } from "../utils/api";
 import { useNavigate } from "react-router-dom";
+import { Download } from "lucide-react";
 
 const Bookings: React.FC = () => {
   const navigate = useNavigate();
@@ -253,16 +254,16 @@ const Bookings: React.FC = () => {
           <div className="flex gap-3">
             <button
               onClick={() => navigate("/bookings/new")}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm font-medium"
+              className="bg-[#982A3D] hover:bg-red-700 text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm"
             >
               <span className="text-lg">+</span>
               Create Booking
             </button>
             <button
               onClick={handleExport}
-              className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md flex items-center gap-2 text-sm"
+              className="bg-[#982A3D] border border-gray-300 hover:bg-gray-50 text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm"
             >
-              <span>⬇</span>
+              <Download size={16} />
               Export CSV
             </button>
           </div>

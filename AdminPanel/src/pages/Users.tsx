@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, MoreVertical } from 'lucide-react';
+import { Search, MoreVertical, Download } from 'lucide-react';
 import { adminAPI, downloadFile } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 
@@ -155,9 +155,9 @@ const Users: React.FC = () => {
             </div>
             <button
               onClick={handleExport}
-              className="border border-gray-300 hover:bg-gray-50 text-gray-700 px-4 py-2 rounded-md flex items-center gap-2 text-sm"
+              className="bg-[#982A3D] border border-gray-300 hover:bg-gray-50 text-white px-4 py-2 rounded-md flex items-center gap-2 text-sm"
             >
-              <span>⬇</span>
+              <Download size={16} />
               Export CSV
             </button>
           </div>
@@ -202,7 +202,7 @@ const Users: React.FC = () => {
                   onClick={() => setActiveTab(tab)}
                   className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
                     activeTab === tab
-                      ? 'bg-red-600 text-white shadow-sm'
+                      ? 'bg-[#982A3D] text-white shadow-sm'
                       : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >

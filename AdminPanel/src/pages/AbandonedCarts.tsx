@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Download, Send, Trash2, Eye, Mail, MessageSquare } from 'lucide-react';
+import { Download, Trash2, Mail, MessageSquare } from 'lucide-react';
 import { adminAPI, downloadFile } from '../utils/api'; // Adjust the import path as necessary
 
 function useDebounce(value, delay) {
@@ -261,7 +261,7 @@ const AbandonedCarts = () => {
           {/* Export Button */}
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+            className="flex items-center gap-2 px-4 py-2 bg-[#982A3D] text-white rounded-md text-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
           >
             <Download size={16} />
             Export CSV
@@ -377,7 +377,7 @@ const AbandonedCarts = () => {
                         {cart.contactInfo?.name || 'Anonymous'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {cart.contactInfo?.phone || cart.contactInfo?.email || 'No contact'}
+                        {cart.contactInfo?.email || cart.contactInfo?.phone ||'No contact'}
                       </div>
                     </div>
                   </td>
@@ -403,9 +403,6 @@ const AbandonedCarts = () => {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-2">
-                      <button className="p-1 text-blue-600 hover:text-blue-800">
-                        <Eye size={16} />
-                      </button>
                       <button onClick={() => handleReminder(cart._id)} className="p-1 text-blue-600 hover:text-blue-800">
                         {getContactMethodIcon(cart)}
                       </button>

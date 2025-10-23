@@ -643,6 +643,7 @@ exports.verifyTicket = async (req, res) => {
     console.log('  - Payment Status:', booking.paymentStatus);
     console.log('  - Status:', booking.status);
     console.log('  - Event Type:', booking.event?.type);
+    console.log('  - Event Date:', booking.date);
     console.log('  - Has Seats:', !!booking.seats?.length);
     console.log('  - Has Tickets:', !!booking.tickets?.length);
 
@@ -660,8 +661,56 @@ exports.verifyTicket = async (req, res) => {
       });
     }
 
+    // ===== CHECK IF EVENT DATE IS TODAY =====
+    const today = new Date();
+    const eventDate = new Date(booking.date);
+    
+    // Compare only date parts (ignore time)
+    const isSameDay = 
+      today.getFullYear() === eventDate.getFullYear() &&
+      today.getMonth() === eventDate.getMonth() &&
+      today.getDate() === eventDate.getDate();
+
+    if (!isSameDay) {
+      // Format dates for better error message
+      const todayFormatted = today.toLocaleDateString('en-IN', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      const eventDateFormatted = eventDate.toLocaleDateString('en-IN', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+
+      // Check if event is in the past or future
+      const isPastEvent = eventDate < today;
+      
+      console.log('ERROR: Event date mismatch');
+      console.log(`  - Today: ${todayFormatted}`);
+      console.log(`  - Event Date: ${eventDateFormatted}`);
+      console.log(`  - Status: ${isPastEvent ? 'Past event' : 'Future event'}`);
+
+      return res.status(400).json({ 
+        success: false, 
+        message: isPastEvent 
+          ? 'This ticket has expired. The event was scheduled for an earlier date.' 
+          : 'This ticket cannot be used yet. The event is scheduled for a future date.',
+        data: {
+          bookingReference: booking.bookingReference,
+          eventDate: eventDateFormatted,
+          todayDate: todayFormatted,
+          eventName: booking.event?.name,
+          venue: booking.event?.venue,
+          time: booking.time
+        }
+      });
+    }
+
+    console.log('✓ Event date matches today - Proceeding with verification');
+
     // ===== VALIDATE TICKET ID =====
-    // Check if ticket exists in booking.tickets array
     const ticketExists = booking.tickets?.some(t => t.ticketId === ticketId);
     
     if (!ticketExists) {
@@ -672,7 +721,7 @@ exports.verifyTicket = async (req, res) => {
       return res.status(400).json({ 
         success: false, 
         message: 'Invalid ticket ID - ticket not found in this booking',
-        details: {
+        data: {
           bookingReference: booking.bookingReference,
           receivedTicketId: ticketId,
           availableTickets: booking.tickets?.length || 0
@@ -684,7 +733,6 @@ exports.verifyTicket = async (req, res) => {
     const ticket = booking.tickets.find(t => t.ticketId === ticketId);
 
     // ===== TRACK USED TICKETS =====
-    // Initialize usedTickets array if not exists
     if (!booking.usedTickets) {
       booking.usedTickets = [];
     }
@@ -705,10 +753,8 @@ exports.verifyTicket = async (req, res) => {
     }
 
     // ===== GET SEAT INFO (FOR SEATED EVENTS) =====
-    // Find which ticket index this is
     const ticketIndex = booking.tickets.findIndex(t => t.ticketId === ticketId);
     
-    // Get seat info if available
     let seatInfo = [];
     let seatLabel = null;
     
@@ -749,7 +795,7 @@ exports.verifyTicket = async (req, res) => {
         seatLabel: seatLabel,
         eventName: booking.event?.name,
         venue: booking.event?.venue,
-        eventType: booking.event?.type, // 'configure' or 'walking'
+        eventType: booking.event?.type,
         date: booking.date,
         time: booking.time,
         seats: seatInfo,
@@ -955,7 +1001,7 @@ exports.getBookingById = async (req, res) => {
     });
   }
 };
-
+ 
 // ✅ Fixed ownership check - handle populated user object
 function verifyOwnership(booking, userId, deviceId, sessionId) {
   console.log('=== OWNERSHIP CHECK ===');

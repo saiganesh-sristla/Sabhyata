@@ -222,7 +222,7 @@ const Events = () => {
         </div>
         <Link
           to="/events/new"
-          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-[#982A3D] text-white rounded-lg hover:bg-red-700 transition-colors"
         >
           <Plus className="w-4 h-4 mr-2" />
           Create Event
@@ -247,7 +247,7 @@ const Events = () => {
                   onClick={() => handleTabChange(tab)}
                   className={`px-4 py-2 rounded-xl ${
                     activeTab === tab
-                      ? "bg-red-600 hover:bg-red-400 text-white"
+                      ? "bg-[#982A3D] hover:bg-gray-600 text-white"
                       : "text-gray-600"
                   } hover:bg-gray-300 transition-colors`}
                 >

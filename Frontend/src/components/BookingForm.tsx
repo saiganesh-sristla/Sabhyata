@@ -91,6 +91,7 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
     isForeigner: false,
   });
   const [eventData, setEventData] = useState<any>(null);
+  const [remainingCapacity, setRemainingCapacity] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [scrollHintCount, setScrollHintCount] = useState(0);
@@ -119,6 +120,176 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
       return null;
     };
   }, [eventData]);
+
+  const hasLanguageAvailable = useMemo(() => {
+    if (!formData.selectedDate) return false;
+    const schedule = getScheduleForDate(formData.selectedDate);
+    if (!schedule || !schedule.timeSlots) return false;
+    
+    const now = new Date();
+    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
+    
+    return schedule.timeSlots.some((slot: any) => {
+      if (!slot.isLangAvailable) return false;
+      
+      if (isToday) {
+        const [hours, minutes] = slot.time.split(':').map(Number);
+        const slotTime = new Date(now);
+        slotTime.setHours(hours, minutes, 0, 0);
+        
+        const oneHourFromNow = new Date(now);
+        oneHourFromNow.setHours(now.getHours() + 1);
+        
+        return slotTime >= oneHourFromNow;
+      }
+      return true;
+    });
+  }, [formData.selectedDate, eventData, getScheduleForDate]);
+
+  const availableLanguages = useMemo(() => {
+    if (!hasLanguageAvailable) return [];
+    
+    const schedule = getScheduleForDate(formData.selectedDate);
+    if (!schedule) return [];
+    
+    const now = new Date();
+    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
+    
+    const validTimeSlots = schedule.timeSlots.filter((slot: any) => {
+      if (!slot.isLangAvailable) return false;
+      
+      if (isToday) {
+        const [hours, minutes] = slot.time.split(':').map(Number);
+        const slotTime = new Date(now);
+        slotTime.setHours(hours, minutes, 0, 0);
+        
+        const oneHourFromNow = new Date(now);
+        oneHourFromNow.setHours(now.getHours() + 1);
+        
+        return slotTime >= oneHourFromNow;
+      }
+      return true;
+    });
+    
+    return [...new Set(validTimeSlots.map((slot: any) => slot.lang))];
+  }, [formData.selectedDate, eventData, getScheduleForDate, hasLanguageAvailable]);
+
+  const selectedTime = useMemo(() => {
+    const schedule = getScheduleForDate(formData.selectedDate);
+    if (!schedule) return "";
+    
+    const now = new Date();
+    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
+    
+    if (hasLanguageAvailable && formData.language) {
+      const validTimeSlot = schedule.timeSlots?.find((slot: any) => {
+        if (!slot.isLangAvailable || slot.lang !== formData.language) return false;
+        
+        if (isToday) {
+          const [hours, minutes] = slot.time.split(':').map(Number);
+          const slotTime = new Date(now);
+          slotTime.setHours(hours, minutes, 0, 0);
+          
+          const oneHourFromNow = new Date(now);
+          oneHourFromNow.setHours(now.getHours() + 1);
+          
+          return slotTime >= oneHourFromNow;
+        }
+        return true;
+      });
+      
+      return validTimeSlot?.time || "";
+    }
+    
+    const validTimeSlot = schedule.timeSlots?.find((slot: any) => {
+      if (isToday) {
+        const [hours, minutes] = slot.time.split(':').map(Number);
+        const slotTime = new Date(now);
+        slotTime.setHours(hours, minutes, 0, 0);
+        
+        const oneHourFromNow = new Date(now);
+        oneHourFromNow.setHours(now.getHours() + 1);
+        
+        return slotTime >= oneHourFromNow;
+      }
+      return true;
+    });
+    
+    return validTimeSlot?.time || "";
+  }, [formData.selectedDate, formData.language, eventData, getScheduleForDate, hasLanguageAvailable]);
+
+  useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      selectedTime,
+    }));
+  }, [selectedTime]);
+
+  // ✅ Fetch remaining capacity when date/time/language changes
+  // ✅ Fetch remaining capacity when date/time/language changes
+useEffect(() => {
+  const fetchRemainingCapacity = async () => {
+    if (!eventId || !formData.selectedDate || !selectedTime) return;
+
+    try {
+      // ✅ Determine event type
+      const isConfigure = eventData?.type === "configure" || eventData?.configureSeats === true;
+      const isWalking = eventData?.type === "walking" || eventData?.configureSeats === false;
+
+      let remaining;
+
+      if (isWalking) {
+        // ✅ For walking: Use events/remaining-capacity endpoint (booking count vs capacity)
+        const response = await fetch(
+          `${API_BASE_URL}/events/${eventId}/remaining-capacity?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+          remaining = data.data.remaining;
+        } else {
+          console.error('Failed to fetch remaining capacity for walking:', data.message);
+          return;
+        }
+      } else if (isConfigure) {
+        // ✅ For configure: Call seat-layouts endpoint and use available_seats
+        const seatResponse = await fetch(
+          `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const seatData = await seatResponse.json();
+
+        if (seatData.success) {
+          remaining = seatData.data.seatLayout.available_seats; // Direct from response
+        } else {
+          console.error('Failed to fetch seat layout:', seatData.message);
+          return;
+        }
+      } else {
+        console.error('Unsupported event type for capacity check');
+        return;
+      }
+
+      setRemainingCapacity(remaining);
+    } catch (error) {
+      console.error('Error fetching remaining capacity:', error);
+      setRemainingCapacity(null);
+    }
+  };
+
+  fetchRemainingCapacity();
+}, [eventId, formData.selectedDate, selectedTime, formData.language, eventData?.type, eventData?.configureSeats, token, API_BASE_URL]);
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -238,110 +409,6 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
     return [];
   }, [eventData]);
 
-  const hasLanguageAvailable = useMemo(() => {
-    if (!formData.selectedDate) return false;
-    const schedule = getScheduleForDate(formData.selectedDate);
-    if (!schedule || !schedule.timeSlots) return false;
-    
-    const now = new Date();
-    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
-    
-    return schedule.timeSlots.some((slot: any) => {
-      if (!slot.isLangAvailable) return false;
-      
-      if (isToday) {
-        const [hours, minutes] = slot.time.split(':').map(Number);
-        const slotTime = new Date(now);
-        slotTime.setHours(hours, minutes, 0, 0);
-        
-        const oneHourFromNow = new Date(now);
-        oneHourFromNow.setHours(now.getHours() + 1);
-        
-        return slotTime >= oneHourFromNow;
-      }
-      return true;
-    });
-  }, [formData.selectedDate, eventData, getScheduleForDate]);
-
-  const availableLanguages = useMemo(() => {
-    if (!hasLanguageAvailable) return [];
-    
-    const schedule = getScheduleForDate(formData.selectedDate);
-    if (!schedule) return [];
-    
-    const now = new Date();
-    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
-    
-    const validTimeSlots = schedule.timeSlots.filter((slot: any) => {
-      if (!slot.isLangAvailable) return false;
-      
-      if (isToday) {
-        const [hours, minutes] = slot.time.split(':').map(Number);
-        const slotTime = new Date(now);
-        slotTime.setHours(hours, minutes, 0, 0);
-        
-        const oneHourFromNow = new Date(now);
-        oneHourFromNow.setHours(now.getHours() + 1);
-        
-        return slotTime >= oneHourFromNow;
-      }
-      return true;
-    });
-    
-    return [...new Set(validTimeSlots.map((slot: any) => slot.lang))];
-  }, [formData.selectedDate, eventData, getScheduleForDate, hasLanguageAvailable]);
-
-  const selectedTime = useMemo(() => {
-    const schedule = getScheduleForDate(formData.selectedDate);
-    if (!schedule) return "";
-    
-    const now = new Date();
-    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
-    
-    if (hasLanguageAvailable && formData.language) {
-      const validTimeSlot = schedule.timeSlots?.find((slot: any) => {
-        if (!slot.isLangAvailable || slot.lang !== formData.language) return false;
-        
-        if (isToday) {
-          const [hours, minutes] = slot.time.split(':').map(Number);
-          const slotTime = new Date(now);
-          slotTime.setHours(hours, minutes, 0, 0);
-          
-          const oneHourFromNow = new Date(now);
-          oneHourFromNow.setHours(now.getHours() + 1);
-          
-          return slotTime >= oneHourFromNow;
-        }
-        return true;
-      });
-      
-      return validTimeSlot?.time || "";
-    }
-    
-    const validTimeSlot = schedule.timeSlots?.find((slot: any) => {
-      if (isToday) {
-        const [hours, minutes] = slot.time.split(':').map(Number);
-        const slotTime = new Date(now);
-        slotTime.setHours(hours, minutes, 0, 0);
-        
-        const oneHourFromNow = new Date(now);
-        oneHourFromNow.setHours(now.getHours() + 1);
-        
-        return slotTime >= oneHourFromNow;
-      }
-      return true;
-    });
-    
-    return validTimeSlot?.time || "";
-  }, [formData.selectedDate, formData.language, eventData, getScheduleForDate, hasLanguageAvailable]);
-
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      selectedTime,
-    }));
-  }, [selectedTime]);
-
   const isTimeValid = useMemo(() => {
     if (!formData.selectedDate || !selectedTime) return false;
     
@@ -372,6 +439,10 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
     formData.adults * foreignerPrice +
     formData.children * foreignerPrice * childrenDiscount;
 
+  // ✅ Capacity validation
+  const isCapacityExceeded = remainingCapacity !== null && totalTickets > remainingCapacity;
+  const canIncrementTickets = remainingCapacity === null || totalTickets < remainingCapacity;
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString([], {
       weekday: "short",
@@ -386,6 +457,16 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
   };
 
   const updateTickets = (type: "adults" | "children", increment: boolean) => {
+    // ✅ Prevent increment if at capacity
+    if (increment && !canIncrementTickets) {
+      toast({
+        title: "Capacity Reached",
+        description: `Only ${remainingCapacity} ticket${remainingCapacity !== 1 ? 's' : ''} remaining for this slot.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setFormData((prev) => ({
       ...prev,
       [type]: Math.max(0, prev[type] + (increment ? 1 : -1)),
@@ -481,6 +562,16 @@ const handleBook = () => {
     toast({
       title: "Error",
       description: "Please select at least one ticket.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  // ✅ Capacity check
+  if (remainingCapacity !== null && totalTickets > remainingCapacity) {
+    toast({
+      title: "Capacity Exceeded",
+      description: `Only ${remainingCapacity} ticket${remainingCapacity !== 1 ? 's' : ''} available for this slot. Please reduce quantity.`,
       variant: "destructive",
     });
     return;
@@ -584,7 +675,8 @@ const handleBook = () => {
     formData.selectedDate && 
     formData.selectedTime && 
     isTimeValid && 
-    (hasLanguageAvailable ? !!formData.language : true);
+    (hasLanguageAvailable ? !!formData.language : true) &&
+    !isCapacityExceeded;
 
   useEffect(() => {
     if (formData.selectedDate && !availableDates.includes(formData.selectedDate)) {
@@ -755,7 +847,7 @@ const handleBook = () => {
                     <p className="text-xs font-semibold">{eventData?.venue || "N/A"}</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-1">
+                <div className="flexitems-center space-x-1">
                   <Clock className="w-3 h-3 text-heritage-burgundy" />
                   <div>
                     <p className="text-xs text-muted-foreground">Duration</p>
@@ -789,7 +881,7 @@ const handleBook = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => updateTickets("adults", true)}
-                      disabled={isInactive}
+                      disabled={isInactive || !canIncrementTickets}
                       className="h-6 w-6 p-0 border-heritage-burgundy/30"
                     >
                       <Plus className="w-3 h-3" />
@@ -816,7 +908,7 @@ const handleBook = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => updateTickets("children", true)}
-                      disabled={isInactive}
+                      disabled={isInactive || !canIncrementTickets}
                       className="h-6 w-6 p-0 border-heritage-burgundy/30"
                     >
                       <Plus className="w-3 h-3" />
@@ -824,6 +916,18 @@ const handleBook = () => {
                   </div>
                 </div>
               </div>
+
+              {/* ✅ Capacity indicator */}
+              {remainingCapacity !== null && (
+                <div className="text-xs text-center text-muted-foreground">
+                  {totalTickets > 0 && isCapacityExceeded && (
+                    <span className="text-red-600 font-medium">Exceeds capacity!</span>
+                  )}
+                  {!isCapacityExceeded && (
+                    <span>{remainingCapacity - totalTickets} spots remaining</span>
+                  )}
+                </div>
+              )}
 
               <div className="flex items-center space-x-1 mt-1">
                 <Checkbox
@@ -1015,7 +1119,7 @@ const handleBook = () => {
               variant="outline"
               size="sm"
               onClick={() => updateTickets("adults", true)}
-              disabled={isInactive}
+              disabled={isInactive || !canIncrementTickets}
               className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10"
             >
               <Plus className="w-4 h-4 text-heritage-burgundy" />
@@ -1043,7 +1147,7 @@ const handleBook = () => {
               variant="outline"
               size="sm"
               onClick={() => updateTickets("children", true)}
-              disabled={isInactive}
+              disabled={isInactive || !canIncrementTickets}
               className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10"
             >
               <Plus className="w-4 h-4 text-heritage-burgundy" />
@@ -1051,6 +1155,18 @@ const handleBook = () => {
           </div>
         </div>
       </div>
+
+      {/* ✅ Capacity indicator */}
+      {remainingCapacity !== null && (
+        <div className="text-sm text-center text-muted-foreground mb-4">
+          {totalTickets > 0 && isCapacityExceeded && (
+            <span className="text-red-600 font-medium">Exceeds capacity!</span>
+          )}
+          {!isCapacityExceeded && (
+            <span>{remainingCapacity - totalTickets} spots remaining</span>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center space-x-3">
         <Checkbox

@@ -22,7 +22,8 @@ const {
   deleteEvent,
   toggleEventStatus,
   getEventCategories,
-  toggleInterest
+  toggleInterest,
+  getRemainingCapacity
 } = require('../../controllers/admin/eventController');
 
 // Public routes with optional authentication (to check userInterested status)
@@ -38,5 +39,7 @@ router.patch('/:id/status', protect, toggleEventStatus);
 
 // User route (requires authentication)
 router.patch('/:id/interest', protect, toggleInterest);
+
+router.get('/:id/remaining-capacity', getRemainingCapacity);
 
 module.exports = router;
