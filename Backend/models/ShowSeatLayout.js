@@ -133,11 +133,15 @@ showSeatLayoutSchema.methods.unlockSeats = async function(seatIds, lockedBy, loc
     { 
       arrayFilters: [
         { 
-          'elem.seatId': { $in: seatIds }, 
-          'elem.status': 'locked',
-          $or: [
-            { 'elem.lockedBy': lockedBy },
-            { 'elem.lockedAt': { $lte: expiryDate } }
+          $and: [
+            { 'elem.seatId': { $in: seatIds } },
+            { 'elem.status': 'locked' },
+            {
+              $or: [
+                { 'elem.lockedBy': lockedBy },
+                { 'elem.lockedAt': { $lte: expiryDate } }
+              ]
+            }
           ]
         }
       ], 
@@ -172,15 +176,45 @@ showSeatLayoutSchema.methods.releaseExpired = async function(lockTimeoutMinutes 
 
   console.log(`🔓 Releasing expired locks for layout ${this._id}, expiry date: ${expiryDate.toISOString()}`);
 
+  // Count locked seats before release
+  const lockedBefore = this.layout_data.filter(s => s.status === 'locked').length;
+  
+  // Debug: Show actual lockedAt timestamps
+  const lockedSeats = this.layout_data.filter(s => s.status === 'locked');
+  if (lockedSeats.length > 0) {
+    console.log(`  - Sample locked seat timestamps:`);
+    lockedSeats.slice(0, 3).forEach(s => {
+      const lockedAtDate = s.lockedAt ? new Date(s.lockedAt) : null;
+      const ageMinutes = lockedAtDate ? Math.floor((Date.now() - lockedAtDate.getTime()) / 60000) : 'N/A';
+      console.log(`    • ${s.seatId}: lockedAt=${s.lockedAt} (${ageMinutes} minutes ago)`);
+    });
+  }
+  
+  const expiredLocks = this.layout_data.filter(s => 
+    s.status === 'locked' && s.lockedAt && new Date(s.lockedAt) <= expiryDate
+  ).length;
+  
+  console.log(`  - Total locked seats: ${lockedBefore}`);
+  console.log(`  - Expired locks to release: ${expiredLocks}`);
+
   const updated = await this.constructor.findOneAndUpdate(
     { _id: this._id },
-    { $set: { 'layout_data.$[elem].status': 'available' }, $unset: { 'layout_data.$[elem].lockedBy': '', 'layout_data.$[elem].lockedAt': '' } },
-    { arrayFilters: [{ 'elem.status': 'locked', 'elem.lockedAt': { $lte: expiryDate } }], new: true }
+    { 
+      $set: { 'layout_data.$[elem].status': 'available' }, 
+      $unset: { 'layout_data.$[elem].lockedBy': '', 'layout_data.$[elem].lockedAt': '' } 
+    },
+    { 
+      arrayFilters: [{ 'elem.status': 'locked', 'elem.lockedAt': { $lte: expiryDate } }], 
+      new: true 
+    }
   ).lean();
 
   if (updated) {
-    const releasedCount = updated.layout_data.filter(s => s.status === 'available' && s.lockedAt === undefined).length;
+    const lockedAfter = updated.layout_data.filter(s => s.status === 'locked').length;
+    const releasedCount = lockedBefore - lockedAfter;
+    
     console.log(`✅ Released ${releasedCount} expired locks in layout ${this._id}`);
+    console.log(`  - Locked seats remaining: ${lockedAfter}`);
     
     await this.constructor.updateOne({ _id: this._id }, {
       $set: {
@@ -202,24 +236,36 @@ showSeatLayoutSchema.statics.cleanupAllExpiredLocks = async function(lockTimeout
     const timeoutMs = lockTimeoutMinutes * 60 * 1000;
     const expiryDate = new Date(Date.now() - timeoutMs);
     
-    // Find all layouts with expired locks
-    const layoutsWithExpiredLocks = await this.find({
-      'layout_data.status': 'locked',
-      'layout_data.lockedAt': { $lte: expiryDate }
+    console.log(`  - Timeout: ${lockTimeoutMinutes} minutes`);
+    console.log(`  - Expiry cutoff: ${expiryDate.toISOString()}`);
+    
+    // Find all layouts with locked seats (we'll check expiry individually)
+    const layoutsWithLocks = await this.find({
+      'layout_data.status': 'locked'
     });
 
-    console.log(`Found ${layoutsWithExpiredLocks.length} layouts with expired locks`);
+    console.log(`  - Found ${layoutsWithLocks.length} layouts with locked seats`);
 
     let totalReleased = 0;
-    for (const layout of layoutsWithExpiredLocks) {
-      const result = await layout.releaseExpired(lockTimeoutMinutes);
-      if (result && result.success) {
-        totalReleased++;
+    let totalSeatsReleased = 0;
+    
+    for (const layout of layoutsWithLocks) {
+      const expiredCount = layout.layout_data.filter(s => 
+        s.status === 'locked' && s.lockedAt && new Date(s.lockedAt) <= expiryDate
+      ).length;
+      
+      if (expiredCount > 0) {
+        console.log(`  - Layout ${layout._id}: ${expiredCount} expired locks to release`);
+        const result = await layout.releaseExpired(lockTimeoutMinutes);
+        if (result && result.success) {
+          totalReleased++;
+          totalSeatsReleased += expiredCount;
+        }
       }
     }
 
-    console.log(`✅ Global cleanup completed: ${totalReleased} layouts processed`);
-    return { success: true, processedLayouts: totalReleased };
+    console.log(`✅ Global cleanup completed: ${totalReleased} layouts processed, ${totalSeatsReleased} seats released`);
+    return { success: true, processedLayouts: totalReleased, seatsReleased: totalSeatsReleased };
   } catch (error) {
     console.error('❌ Global cleanup error:', error);
     return { success: false, error: error.message };

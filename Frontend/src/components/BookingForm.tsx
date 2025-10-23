@@ -258,6 +258,19 @@ useEffect(() => {
           return;
         }
       } else if (isConfigure) {
+        // ✅ First, trigger manual cleanup to release any expired locks
+        try {
+          await fetch(`${API_BASE_URL}/temp-bookings/test-cleanup`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          console.log('🧹 Triggered manual cleanup of expired locks');
+        } catch (cleanupError) {
+          console.warn('Cleanup trigger failed (non-critical):', cleanupError);
+        }
+
         // ✅ For configure: Call seat-layouts endpoint and use available_seats
         const seatResponse = await fetch(
           `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,

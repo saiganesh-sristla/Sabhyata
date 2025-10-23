@@ -110,15 +110,18 @@ exports.createTempBooking = async (req, res) => {
           }
         }
 
-        // Lock seats in the layout
-        for (const seatId of seatIds) {
-          const seat = seatLayout.layout_data.find(s => s.seatId === seatId);
-          if (seat) {
-            seat.status = 'locked';
-          }
+        // Lock seats in the layout using the proper method
+        const lockResult = await seatLayout.lockSeats(seatIds, sessionId);
+        if (lockResult && lockResult.success) {
+          console.log(`✓ Locked ${seatIds.length} seats in layout with timestamps`);
+        } else {
+          console.error('Failed to lock seats:', lockResult);
+          return res.status(400).json({
+            success: false,
+            message: 'Failed to lock seats',
+            conflicted: lockResult?.conflicted || []
+          });
         }
-        await seatLayout.save();
-        console.log(`✓ Locked ${seatIds.length} seats in layout`);
       } else {
         console.log('No seat layout found - proceeding without locking');
       }
@@ -127,13 +130,26 @@ exports.createTempBooking = async (req, res) => {
     // ===== CREATE TEMP BOOKING (NO TICKETS YET) =====
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
+    // Clean seat data - remove lockedAt/lockedBy fields from request
+    const cleanedSeats = (seats || []).map(seat => ({
+      seatId: seat.seatId,
+      row: seat.row,
+      number: seat.number,
+      section: seat.section,
+      category: seat.category,
+      price: seat.price,
+      status: seat.status,
+      coords: seat.coords
+      // Don't include lockedAt, lockedBy - backend sets these
+    }));
+
     const booking = await Booking.create({
       bookingReference: bookingReference, // ✅ MUST PROVIDE THIS
       event: eventId,
       date: new Date(date),
       time,
       language: language || 'none',
-      seats: seats || [],
+      seats: cleanedSeats,
       tickets: [], // ✅ Empty - tickets generated after payment
       adults: adults || 0,
       children: children || 0,
@@ -222,6 +238,24 @@ async function releaseExpiredBooking(bookingId) {
   }
 }
 
+// ✅ Cleanup expired seat locks in all ShowSeatLayouts
+async function cleanupExpiredSeatLocks() {
+  try {
+    console.log('🧹 Starting cleanup of expired seat locks...');
+    
+    // Call the static method on ShowSeatLayout model to cleanup all expired locks
+    const result = await ShowSeatLayout.cleanupAllExpiredLocks(5); // 5 minutes timeout
+    
+    if (result && result.success) {
+      console.log(`✅ Seat lock cleanup completed: ${result.processedLayouts} layouts processed`);
+    } else {
+      console.error('❌ Seat lock cleanup failed:', result?.error);
+    }
+  } catch (error) {
+    console.error('❌ Seat lock cleanup error:', error);
+  }
+}
+
 // ✅ Cleanup expired bookings (works with regular Booking model)
 exports.cleanupExpiredBookings = async () => {
   try {
@@ -251,10 +285,10 @@ exports.cleanupExpiredBookings = async () => {
 exports.testCleanup = async (req, res) => {
   try {
     console.log('🧪 Manual test cleanup triggered');
-    await cleanupExpiredBookings();
+    await exports.cleanupExpiredBookings();
     res.json({
       success: true,
-      message: 'Test cleanup completed',
+      message: 'Test cleanup completed - check server logs for details',
       timestamp: new Date().toISOString()
     });
   } catch (error) {
@@ -295,7 +329,7 @@ exports.getTempBooking = async (req, res) => {
         success: false,
         message: 'Booking expired'
       });
-    }
+    } 
 
     // Verify ownership
     const userId = req.user?._id;
