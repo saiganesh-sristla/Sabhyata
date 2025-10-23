@@ -548,21 +548,16 @@ const Bookings: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1 text-center">
-                        <span className="text-sm text-gray-900">
-                          {booking.tickets?.length || 0}
-                        </span>
-                        <span className="text-sm text-gray-900 bg-gray-200 px-2.5 py-0.5 rounded-full">
-                          used{" "}
-                          {
-                            booking.tickets?.filter((ticket: any) => ticket.isUsed)
-                              .length || 0
-                          }
-                          /{booking.tickets?.length || 0}
-                        </span>
-                      </div>
-                    </td>
+                   <td className="px-6 py-4 whitespace-nowrap flex flex-col gap-1 text-center">
+                    <span className="text-sm text-gray-900">
+                      {booking.tickets?.length || 0}
+                    </span>
+                    <span className="text-sm text-gray-900 bg-gray-200 px-2.5 py-0.5 rounded-full">
+                      used{" "}
+                      {booking.usedTickets?.length || 0}
+                      /{booking.tickets?.length || 0}
+                    </span>
+                  </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

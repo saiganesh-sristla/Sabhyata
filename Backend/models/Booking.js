@@ -53,6 +53,14 @@ const ticketSchema = new mongoose.Schema({
   price: {
     type: Number,
     required: true
+  },
+  isUsed: {
+    type: Boolean,
+    default: false
+  },
+  seatLabel: {
+    type: String,
+    default: null
   }
 }, { _id: false });
 

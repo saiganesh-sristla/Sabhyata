@@ -114,9 +114,9 @@ app.use('/api/partners', partnerRoutes);
 app.use('/api/partner-events', partnerEvents);
 app.use('/api/temp-bookings', tempBookingRoutes);
 
-// Run cleanup every minute
+// Run cleanup every 30 seconds for better testing
 const { cleanupExpiredBookings } = require('./controllers/tempBookingController');
-setInterval(cleanupExpiredBookings, 60 * 1000);
+setInterval(cleanupExpiredBookings, 30 * 1000);
 
 
 // Health check

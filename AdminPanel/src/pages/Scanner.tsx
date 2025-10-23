@@ -140,8 +140,8 @@ const Scanner = () => {
     
     try {
       const response = await axios.get(
-        // `https://sabhyata.onrender.com/api/payments/verify-ticket/${bookingId}/${ticketId}`,
-        `http://localhost:5000/api/payments/verify-ticket/${bookingId}/${ticketId}`,
+        `https://sabhyata.onrender.com/api/payments/verify-ticket/${bookingId}/${ticketId}`,
+        // `http://localhost:5000/api/payments/verify-ticket/${bookingId}/${ticketId}`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,

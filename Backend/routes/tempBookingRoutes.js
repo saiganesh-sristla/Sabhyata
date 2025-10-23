@@ -7,6 +7,7 @@ const {
   getTempBooking,
   convertTempToRealBooking, // NEW
   cancelTempBooking,
+  testCleanup,
 } = require('../controllers/tempBookingController');
 
 // Create temporary booking (lock seats)
@@ -20,5 +21,8 @@ router.post('/:tempBookingId/convert-to-real', optionalAuth, convertTempToRealBo
 
 // Cancel temporary booking
 router.post('/:tempBookingId/cancel', optionalAuth, cancelTempBooking);
+
+// ✅ Test cleanup endpoint
+router.post('/test-cleanup', testCleanup);
 
 module.exports = router;

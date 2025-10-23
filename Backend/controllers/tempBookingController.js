@@ -185,49 +185,85 @@ async function releaseExpiredBooking(bookingId) {
     const booking = await Booking.findById(bookingId);
     if (!booking || booking.status !== 'pending') return;
 
+    console.log(`Releasing expired booking: ${booking.bookingReference}`);
+
     // Release seats if locked
     if (booking.seats && booking.seats.length > 0) {
+      const showDate = booking.date instanceof Date ? booking.date : new Date(booking.date);
       const seatLayout = await ShowSeatLayout.findOne({
-        event: booking.event,
-        date: booking.date,
-        time: booking.time
+        event_id: booking.event,
+        date: showDate,
+        time: booking.time,
+        language: booking.language || ''
       });
 
       if (seatLayout) {
-        for (const seat of booking.seats) {
-          const layoutSeat = seatLayout.layoutdata.find(s => s.seatId === seat.seatId);
-          if (layoutSeat && layoutSeat.status === 'locked') {
-            layoutSeat.status = 'available';
-          }
+        const seatIds = booking.seats.map(s => s.seatId);
+        console.log(`Releasing seats: ${seatIds.join(', ')}`);
+        
+        // Use the proper unlock method
+        const unlockResult = await seatLayout.unlockSeats(seatIds, booking.sessionId);
+        if (unlockResult && unlockResult.success) {
+          console.log(`✅ Released ${seatIds.length} seats for booking ${booking.bookingReference}`);
+        } else {
+          console.error(`❌ Failed to release seats for booking ${booking.bookingReference}`);
         }
-        await seatLayout.save();
+      } else {
+        console.log(`No seat layout found for booking ${booking.bookingReference}`);
       }
     }
 
     booking.status = 'expired';
     await booking.save();
     
-    console.log(`Released expired booking: ${booking.bookingReference}`);
+    console.log(`✅ Released expired booking: ${booking.bookingReference}`);
   } catch (error) {
     console.error('Error releasing booking:', error);
   }
 }
 
-// Cleanup expired bookings
+// ✅ Cleanup expired bookings (works with regular Booking model)
 exports.cleanupExpiredBookings = async () => {
   try {
+    console.log('🧹 Starting cleanup of expired bookings...');
+    
     const expiredBookings = await Booking.find({
       status: 'pending',
       expiresAt: { $lt: new Date() }
     });
 
+    console.log(`Found ${expiredBookings.length} expired bookings to clean up`);
+
     for (const booking of expiredBookings) {
       await releaseExpiredBooking(booking._id);
     }
 
-    console.log(`Cleaned up ${expiredBookings.length} expired bookings`);
+    // Also cleanup expired seat locks in ShowSeatLayout
+    await cleanupExpiredSeatLocks();
+
+    console.log(`✅ Cleanup completed: ${expiredBookings.length} expired bookings processed`);
   } catch (error) {
-    console.error('Cleanup error:', error);
+    console.error('❌ Cleanup error:', error);
+  }
+};
+
+// ✅ Test endpoint to manually trigger cleanup
+exports.testCleanup = async (req, res) => {
+  try {
+    console.log('🧪 Manual test cleanup triggered');
+    await cleanupExpiredBookings();
+    res.json({
+      success: true,
+      message: 'Test cleanup completed',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Test cleanup error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Test cleanup failed',
+      error: error.message
+    });
   }
 };
 
@@ -589,23 +625,7 @@ async function releaseTempBooking(tempBookingId) {
   }
 }
 
-// Cleanup expired bookings (run periodically)
-exports.cleanupExpiredBookings = async () => {
-  try {
-    const expiredBookings = await TempBooking.find({
-      status: 'active',
-      expiresAt: { $lt: new Date() }
-    });
-
-    for (const booking of expiredBookings) {
-      await releaseTempBooking(booking.tempBookingId);
-    }
-
-    console.log(`Cleaned up ${expiredBookings.length} expired bookings`);
-  } catch (error) {
-    console.error('Cleanup error:', error);
-  }
-};
+// This function is now handled by the main cleanupExpiredBookings function above
 
 // Convert temp booking to real booking (after payment)
 exports.convertTempToRealBooking = async (req, res) => {

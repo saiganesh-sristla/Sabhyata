@@ -167,7 +167,7 @@ useEffect(() => {
           if (data.data.expiresAt) {
             const expiresAt = new Date(data.data.expiresAt);
             const now = new Date();
-            const remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+            const remainingSeconds = Math.max(0, Math.floor((expiresAt.getTime() - now.getTime()) / 1000));
             setTimer(remainingSeconds);
           }
         } else {
@@ -467,7 +467,7 @@ useEffect(() => {
               contactInfo: contactInfo,
               specialNotes: specialNotes
             } : {
-              bookingId: bookingId,
+              tempBookingId: bookingId, // ✅ Use tempBookingId for seated events (pending bookings)
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
@@ -524,7 +524,7 @@ useEffect(() => {
         }
       };
 
-      const rzp = new window.Razorpay(options);
+      const rzp = new (window as any).Razorpay(options);
       rzp.open();
 
     } catch (error) {
@@ -616,7 +616,7 @@ useEffect(() => {
               className="w-full h-48 object-cover rounded-lg mb-4"
               crossOrigin="anonymous"
               onError={(e) => {
-                e.target.src = "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=300&h=200&fit=crop";
+                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=300&h=200&fit=crop";
               }}
             />
 
@@ -709,7 +709,7 @@ useEffect(() => {
                     value={contactInfo.phone.substring(4)}
                     onChange={(e) => handleContactChange("phone", "+91 " + e.target.value)}
                     placeholder="Enter 10-digit number"
-                    maxLength="10"
+                    maxLength={10}
                     className="w-full pl-14 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                     disabled={isPaying}
                   />
@@ -809,8 +809,8 @@ useEffect(() => {
               onClick={handlePayment}
               disabled={
                 (!isWalkingTour && timer === 0) || // Only check timer for seated events
-                formErrors.email || 
-                formErrors.phone || 
+                Boolean(formErrors.email) || 
+                Boolean(formErrors.phone) || 
                 isPaying || 
                 !contactInfo.name.trim()
               }

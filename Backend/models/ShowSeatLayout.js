@@ -121,13 +121,37 @@ showSeatLayoutSchema.methods.unlockSeats = async function(seatIds, lockedBy, loc
   const timeoutMs = lockTimeoutMinutes * 60 * 1000;
   const expiryDate = new Date(Date.now() - timeoutMs);
 
+  console.log(`🔓 Unlocking seats: ${seatIds.join(', ')}, lockedBy: ${lockedBy}, expiryDate: ${expiryDate.toISOString()}`);
+
+  // ✅ Fix: Use separate arrayFilters for each condition instead of $or
   const updated = await this.constructor.findOneAndUpdate(
     { _id: this._id },
-    { $set: { 'layout_data.$[elem].status': 'available' }, $unset: { 'layout_data.$[elem].lockedBy': '', 'layout_data.$[elem].lockedAt': '' } },
-    { arrayFilters: [{ 'elem.seatId': { $in: seatIds }, $or: [ { 'elem.lockedBy': lockedBy }, { 'elem.lockedAt': { $lte: expiryDate } } ] }], new: true }
+    { 
+      $set: { 'layout_data.$[elem].status': 'available' }, 
+      $unset: { 'layout_data.$[elem].lockedBy': '', 'layout_data.$[elem].lockedAt': '' } 
+    },
+    { 
+      arrayFilters: [
+        { 
+          'elem.seatId': { $in: seatIds }, 
+          'elem.status': 'locked',
+          $or: [
+            { 'elem.lockedBy': lockedBy },
+            { 'elem.lockedAt': { $lte: expiryDate } }
+          ]
+        }
+      ], 
+      new: true 
+    }
   ).lean();
 
   if (updated) {
+    const unlockedCount = updated.layout_data.filter(s => 
+      seatIds.includes(s.seatId) && s.status === 'available' && !s.lockedBy
+    ).length;
+    
+    console.log(`✅ Unlocked ${unlockedCount} seats`);
+    
     await this.constructor.updateOne({ _id: this._id }, {
       $set: {
         total_seats: updated.layout_data.length,
@@ -138,12 +162,15 @@ showSeatLayoutSchema.methods.unlockSeats = async function(seatIds, lockedBy, loc
     return { success: true, seatLayout: updated };
   }
 
+  console.log('❌ Failed to unlock seats - no update performed');
   return { success: false, message: 'Failed to unlock seats' };
 };
 
 showSeatLayoutSchema.methods.releaseExpired = async function(lockTimeoutMinutes = 5) {
   const timeoutMs = lockTimeoutMinutes * 60 * 1000;
   const expiryDate = new Date(Date.now() - timeoutMs);
+
+  console.log(`🔓 Releasing expired locks for layout ${this._id}, expiry date: ${expiryDate.toISOString()}`);
 
   const updated = await this.constructor.findOneAndUpdate(
     { _id: this._id },
@@ -152,6 +179,9 @@ showSeatLayoutSchema.methods.releaseExpired = async function(lockTimeoutMinutes 
   ).lean();
 
   if (updated) {
+    const releasedCount = updated.layout_data.filter(s => s.status === 'available' && s.lockedAt === undefined).length;
+    console.log(`✅ Released ${releasedCount} expired locks in layout ${this._id}`);
+    
     await this.constructor.updateOne({ _id: this._id }, {
       $set: {
         total_seats: updated.layout_data.length,
@@ -162,6 +192,38 @@ showSeatLayoutSchema.methods.releaseExpired = async function(lockTimeoutMinutes 
   }
 
   return { success: true, seatLayout: updated };
+};
+
+// ✅ Static method to cleanup all expired locks across all show layouts
+showSeatLayoutSchema.statics.cleanupAllExpiredLocks = async function(lockTimeoutMinutes = 5) {
+  try {
+    console.log('🧹 Starting global cleanup of expired seat locks...');
+    
+    const timeoutMs = lockTimeoutMinutes * 60 * 1000;
+    const expiryDate = new Date(Date.now() - timeoutMs);
+    
+    // Find all layouts with expired locks
+    const layoutsWithExpiredLocks = await this.find({
+      'layout_data.status': 'locked',
+      'layout_data.lockedAt': { $lte: expiryDate }
+    });
+
+    console.log(`Found ${layoutsWithExpiredLocks.length} layouts with expired locks`);
+
+    let totalReleased = 0;
+    for (const layout of layoutsWithExpiredLocks) {
+      const result = await layout.releaseExpired(lockTimeoutMinutes);
+      if (result && result.success) {
+        totalReleased++;
+      }
+    }
+
+    console.log(`✅ Global cleanup completed: ${totalReleased} layouts processed`);
+    return { success: true, processedLayouts: totalReleased };
+  } catch (error) {
+    console.error('❌ Global cleanup error:', error);
+    return { success: false, error: error.message };
+  }
 };
 
 module.exports = mongoose.model('ShowSeatLayout', showSeatLayoutSchema);

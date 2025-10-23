@@ -431,13 +431,14 @@ if (eventId && !bookingId && !tempBookingId) {
 }
 
 
-   // ✅ SEATED EVENT - Handle temp booking conversion
+   // ✅ SEATED EVENT - Handle temp booking conversion (using regular Booking model)
 if (tempBookingId) {
   console.log('Converting temp booking to real:', tempBookingId);
   
-  const tempBooking = await TempBooking.findOne({
-    tempBookingId,
-    status: 'active'
+  // Find the pending booking (temp booking is actually a regular Booking with status 'pending')
+  const tempBooking = await Booking.findOne({
+    _id: tempBookingId,
+    status: 'pending'
   }).populate('event');
 
   if (!tempBooking) {
@@ -448,7 +449,7 @@ if (tempBookingId) {
   }
 
   // Check expiry
-  if (new Date() > tempBooking.expiresAt) {
+  if (tempBooking.expiresAt && new Date() > tempBooking.expiresAt) {
     tempBooking.status = 'expired';
     await tempBooking.save();
     
@@ -458,65 +459,91 @@ if (tempBookingId) {
     });
   }
 
-  // Generate tickets
+  // ✅ Generate tickets with proper seat labels
   const tickets = [];
   
-  for (let i = 0; i < tempBooking.adults; i++) {
-    const ticketPrice = tempBooking.seats && tempBooking.seats[i] 
-      ? tempBooking.seats[i].price 
-      : Math.round(tempBooking.totalAmount / (tempBooking.adults + tempBooking.children));
-    
-    tickets.push({
-      ticketId: `TKT-${Date.now()}-${uuidv4().slice(0, 8)}`,
-      type: 'adult',
-      price: ticketPrice
+  if (tempBooking.seats && tempBooking.seats.length > 0) {
+    // For seated events - generate tickets based on seats
+    tempBooking.seats.forEach((seat, index) => {
+      const seatLabel = seat.seatId || `${seat.row}${seat.number}`;
+      const ticketType = index < tempBooking.adults ? 'adult' : 'child';
+      
+      tickets.push({
+        ticketId: `TKT-${Date.now()}-${uuidv4().slice(0, 8)}`,
+        type: ticketType,
+        price: seat.price,
+        isUsed: false,
+        seatLabel: seatLabel
+      });
     });
-  }
-  
-  for (let i = 0; i < tempBooking.children; i++) {
-    const ticketPrice = tempBooking.seats && tempBooking.seats[tempBooking.adults + i] 
-      ? tempBooking.seats[tempBooking.adults + i].price 
-      : Math.round(tempBooking.totalAmount / (tempBooking.adults + tempBooking.children));
+  } else {
+    // Fallback for non-seated events
+    for (let i = 0; i < tempBooking.adults; i++) {
+      tickets.push({
+        ticketId: `TKT-${Date.now()}-${uuidv4().slice(0, 8)}`,
+        type: 'adult',
+        price: Math.round(tempBooking.totalAmount / (tempBooking.adults + tempBooking.children)),
+        isUsed: false,
+        seatLabel: `Adult ${i + 1}`
+      });
+    }
     
-    tickets.push({
-      ticketId: `TKT-${Date.now()}-${uuidv4().slice(0, 8)}`,
-      type: 'child',
-      price: ticketPrice
-    });
+    for (let i = 0; i < tempBooking.children; i++) {
+      tickets.push({
+        ticketId: `TKT-${Date.now()}-${uuidv4().slice(0, 8)}`,
+        type: 'child',
+        price: Math.round(tempBooking.totalAmount / (tempBooking.adults + tempBooking.children)),
+        isUsed: false,
+        seatLabel: `Child ${i + 1}`
+      });
+    }
   }
 
-  // ✅ Generate booking reference manually
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substr(2, 6).toUpperCase();
-  const bookingReference = `BKG-${timestamp}-${random}`;
-
-  // Create real booking
-  const booking = await Booking.create({
-    bookingReference, // ✅ Add this
-    event: tempBooking.event._id,
-    date: tempBooking.date,
-    time: tempBooking.time,
-    language: tempBooking.language,
-    seats: tempBooking.seats,
-    tickets,
-    adults: tempBooking.adults,
-    children: tempBooking.children,
-    totalAmount: tempBooking.totalAmount,
-    contactInfo: contactInfo || {},
-    paymentMethod: tempBooking.paymentMethod,
-    notes: specialNotes || '',
+  // ✅ Update the existing booking with tickets and payment info
+  const updatedBooking = await Booking.findByIdAndUpdate(tempBookingId, {
+    tickets: tickets,
     status: 'confirmed',
     paymentStatus: 'paid',
-    user: tempBooking.userId,
-    bookingType: tempBooking.userId ? 'user' : 'admin',
-    sessionId: tempBooking.sessionId,
+    contactInfo: contactInfo || tempBooking.contactInfo,
+    notes: specialNotes || tempBooking.notes,
     razorpayOrderId: razorpay_order_id,
-    razorpayPaymentId: razorpay_payment_id
+    razorpayPaymentId: razorpay_payment_id,
+    expiresAt: null // Remove expiry since it's now confirmed
+  }, { new: true });
+
+  console.log('✅ Updated booking with tickets:', updatedBooking.bookingReference);
+
+  // ✅ Mark seats as booked in ShowSeatLayout
+  if (tempBooking.seats && tempBooking.seats.length > 0) {
+    const showDate = tempBooking.date instanceof Date ? tempBooking.date : new Date(tempBooking.date);
+    const showLayout = await ShowSeatLayout.findOne({ 
+      event_id: tempBooking.event._id, 
+      date: showDate, 
+      time: tempBooking.time, 
+      language: tempBooking.language || '' 
+    });
+    
+    if (showLayout) {
+      const seatIds = tempBooking.seats.map(s => s.seatId);
+      const bookResult = await showLayout.bookSeats(seatIds, tempBooking.sessionId);
+      
+      if (bookResult && bookResult.success) {
+        console.log('✅ Seats marked as booked in layout');
+      } else {
+        console.error('❌ Failed to mark seats as booked:', bookResult?.message);
+      }
+    }
+  }
+
+  return res.json({ 
+    success: true, 
+    message: 'Payment verified and booking confirmed',
+    data: {
+      bookingId: updatedBooking._id,
+      bookingReference: updatedBooking.bookingReference,
+      paymentId: razorpay_payment_id
+    }
   });
-
-  console.log('✅ Created real booking:', booking.bookingReference);
-
-  // ... rest of the code stays same
 }
 
 
@@ -538,11 +565,11 @@ if (tempBookingId) {
         });
       }
 
-      // Book seats if configured event
-      if (booking.event.type === 'configure') {
+      // ✅ Book seats if configured event
+      if (booking.event.type === 'configure' && booking.seats && booking.seats.length > 0) {
         const showDate = booking.date instanceof Date ? booking.date : new Date(booking.date);
         const showLayout = await ShowSeatLayout.findOne({ 
-          event: booking.event._id, 
+          event_id: booking.event._id, 
           date: showDate, 
           time: booking.time, 
           language: booking.language || '' 
@@ -554,12 +581,14 @@ if (tempBookingId) {
           const bookResult = await showLayout.bookSeats(seatIds, booking.sessionId);
           
           if (!bookResult || !bookResult.success) {
+            console.error('❌ Failed to book seats:', bookResult?.message);
             return res.status(409).json({ 
               success: false, 
               message: 'Failed to finalize seat booking after payment', 
               conflicted: bookResult?.conflicted || [] 
             });
           }
+          console.log('✅ Seats marked as booked in layout');
         }
       }
 

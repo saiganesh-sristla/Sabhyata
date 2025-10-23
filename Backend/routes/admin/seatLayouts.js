@@ -12,7 +12,8 @@ const {
   getSeatAvailability,
   bookSeats,
   lockSeatsUser,
-  unlockSeatsUser
+  unlockSeatsUser,
+  cleanupExpiredSeatLocks
 } = require('../../controllers/admin/seatLayoutController');
 const SeatLayout = require('../../models/SeatLayout');
 
@@ -25,6 +26,7 @@ router.post('/:event_id/hold-seats', holdSeats);
 router.post('/:event_id/release-seats', releaseSeats);
 router.post('/:event_id/publish', publishSeatLayout);
 router.get('/:event_id/availability', getSeatAvailability);
+router.post('/cleanup-expired-locks', cleanupExpiredSeatLocks);
 
 // User-facing routes
 router.post('/:id/book', bookSeats);

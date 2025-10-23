@@ -761,3 +761,36 @@ exports.getSeatAvailability = async (req, res) => {
     });
   }
 };
+
+// ✅ Manual cleanup endpoint for expired seat locks (admin only)
+exports.cleanupExpiredSeatLocks = async (req, res) => {
+  try {
+    console.log('🧹 Manual cleanup of expired seat locks requested');
+    
+    const result = await ShowSeatLayout.cleanupAllExpiredLocks(5); // 5 minutes timeout
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: `Cleanup completed successfully`,
+        data: {
+          processedLayouts: result.processedLayouts,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Cleanup failed',
+        error: result.error
+      });
+    }
+  } catch (error) {
+    console.error('Manual cleanup error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cleanup expired seat locks',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+};

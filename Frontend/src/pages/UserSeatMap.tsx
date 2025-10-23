@@ -310,6 +310,39 @@ const UserSeatMap: React.FC<UserSeatMapProps> = ({ onClose }) => {
     fetchSeatLayout();
   }, [eventId, selectedDate, selectedTime, language, seatLayoutEndpoint]);
 
+  // ✅ Auto-refresh seat layout every 30 seconds to show expired locks
+  useEffect(() => {
+    if (!eventId || !selectedDate || !selectedTime) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
+        console.log('🔄 Auto-refreshing seat layout...');
+        const response = await apiRequest(seatLayoutEndpoint());
+        if (response.success && response.data.seatLayout?.layout_data) {
+          const newSeats = Array.isArray(response.data.seatLayout.layout_data)
+            ? response.data.seatLayout.layout_data
+            : [];
+          
+          // Only update if seats have changed (to avoid unnecessary re-renders)
+          const hasChanges = JSON.stringify(newSeats) !== JSON.stringify(seats);
+          if (hasChanges) {
+            console.log('✅ Seat layout updated - expired locks released');
+            setSeats(newSeats);
+            setCategories(
+              response.data.seatLayout.categories?.length > 0
+                ? response.data.seatLayout.categories
+                : defaultCategories
+            );
+          }
+        }
+      } catch (error) {
+        console.error('Auto-refresh error:', error);
+      }
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [eventId, selectedDate, selectedTime, language, seatLayoutEndpoint, seats]);
+
   // Enhanced canvas size calculation with DPR support
   const updateCanvasSize = useCallback(() => {
     if (!containerRef.current) {
