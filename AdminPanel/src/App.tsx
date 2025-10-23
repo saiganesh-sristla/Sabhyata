@@ -19,6 +19,7 @@ import SeatMap from './pages/SeatMapEditor';
 import AdminPartners from './pages/AdminPartners';
 import Scanner from './pages/Scanner';
 import StaffLogin from './pages/auth/StaffLogin';
+import NotFound from './pages/NotFound.tsx';
 import { useLocation } from 'react-router-dom';
 
 // Protected Route Component
@@ -81,7 +82,7 @@ function App() {
                       <Route path="/dashboard" element={<Dashboard />} />
                       
                       <Route path="/events" element={<Events />} />
-                      <Route path="/events/new" element={<EventForm />} />
+                      <Route path="/events/new" element={<EventForm />} /> 
                       <Route path="/events/:id/edit" element={<EventForm />} />
                       <Route path="/seat-config/:eventId" element={<SeatMap />} />
 
@@ -100,6 +101,8 @@ function App() {
                       <Route path="/abandoned-carts" element={<AbandonedCarts />} />
                       <Route path="/partners" element={<AdminPartners />} />
                       <Route path="/scanner" element={<Scanner />} />
+                      
+                       <Route path="*" element={<NotFound />} />
                     </Routes>
                   </AdminLayout>
                 </ProtectedRoute>

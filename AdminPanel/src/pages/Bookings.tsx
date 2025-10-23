@@ -36,6 +36,10 @@ const Bookings: React.FC = () => {
     setLoading(true);
     try {
       const params: any = { page, limit: pagination.limit };
+      
+      // Exclude pending payment status bookings
+      params.excludePendingPayments = true;
+      
       if (searchTerm) params.search = searchTerm;
       if (statusFilter !== "All") {
         if (statusFilter === "Cancelled") {
@@ -60,7 +64,13 @@ const Bookings: React.FC = () => {
 
       const response = await adminAPI.getBookings(params);
       console.log(response.data.data.bookings);
-      setBookings(response.data.data.bookings);
+      
+      // Client-side filter to ensure pending payments are excluded
+      const filteredBookings = response.data.data.bookings.filter(
+        (booking: any) => booking.paymentStatus !== "pending"
+      );
+      
+      setBookings(filteredBookings);
       setPagination(response.data.data.pagination);
     } catch (err) {
       console.error("Failed to fetch bookings:", err);
@@ -141,6 +151,8 @@ const Bookings: React.FC = () => {
   const handleExport = async () => {
     try {
       const params: any = {};
+      params.excludePendingPayments = true;
+      
       if (searchTerm) params.search = searchTerm;
       if (statusFilter !== "All") {
         if (statusFilter === "Cancelled") {
@@ -163,7 +175,18 @@ const Bookings: React.FC = () => {
       if (endDate) params.endDate = endDate;
 
       const response = await adminAPI.exportBookings(params);
-      downloadFile(response, "bookings_export.csv");
+      
+      // Create blob from response data
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = `bookings_export_${new Date().toISOString().split('T')[0]}.csv`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Failed to export bookings:", err);
     }
@@ -196,6 +219,8 @@ const Bookings: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this booking?")) return;
+    
     try {
       await adminAPI.deleteBooking(id);
       fetchBookings(pagination.currentPage);
@@ -249,7 +274,7 @@ const Bookings: React.FC = () => {
         <div className="flex gap-4 mb-4 flex-wrap">
           <input
             type="text"
-            placeholder="Search by name, phone, monument, invoice/booking ID..."
+            placeholder="Search by name, phone, monument, event, invoice/booking ID..."
             className="flex-1 min-w-72 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -266,27 +291,13 @@ const Bookings: React.FC = () => {
             value={endDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
-        </div>
-
-        <div className="flex gap-4 mb-4 flex-wrap">
-          <select
-            className="px-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option>All</option>
-            <option>Paid</option>
-            <option>Pending</option>
-            <option>Cancelled</option>
-            <option>Upcoming</option>
-            <option>Past</option>
-          </select>
-          <select
+             <select
             className="px-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={channelsFilter}
             onChange={(e) => setChannelsFilter(e.target.value)}
           >
             <option>All Channels</option>
+            <option>Manual</option>
             <option>BookMyShow</option>
             <option>Website</option>
           </select>
@@ -295,11 +306,11 @@ const Bookings: React.FC = () => {
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
           >
-            <option>All Payment Methods</option>
-            <option>UPI</option>
-            <option>Card</option>
-            <option>Netbanking</option>
-            <option>Wallet</option>
+            <option value="All Payment Methods">Payment Methods</option>
+            <option value="UPI">UPI</option>
+            <option value="Card">Card</option>
+            <option value="Netbanking">Netbanking</option>
+            <option value="Wallet">Wallet</option>
           </select>
         </div>
       </div>
@@ -307,7 +318,7 @@ const Bookings: React.FC = () => {
       {/* Status Tabs */}
       <div className="mb-6">
         <div className="flex gap-6 border-b border-gray-200">
-          {["All", "Upcoming", "Past", "Paid", "Pending", "Cancelled"].map(
+          {["All", "Upcoming", "Past"].map(
             (tab) => (
               <button
                 key={tab}
@@ -323,8 +334,6 @@ const Bookings: React.FC = () => {
                   className={`px-2 py-1 rounded text-xs ${
                     tab === "Paid"
                       ? "bg-green-100 text-green-700"
-                      : tab === "Pending"
-                      ? "bg-orange-100 text-orange-700"
                       : tab === "Cancelled"
                       ? "bg-red-100 text-red-700"
                       : "bg-gray-200 text-gray-700"
@@ -333,14 +342,13 @@ const Bookings: React.FC = () => {
                   {tab === "All" && pagination.totalCount}
                   {tab === "Upcoming" && analytics.upcomingBookings}
                   {tab === "Past" && analytics.pastBookings}
-                  {tab === "Paid" &&
+                  {/* {tab === "Paid" &&
                     analytics.paymentMethodStats.reduce(
                       (sum: number, stat: any) =>
                         sum + (stat._id === "paid" ? stat.count : 0),
                       0
                     )}
-                  {tab === "Pending" && analytics.pendingPayments}
-                  {tab === "Cancelled" && analytics.cancelledBookings}
+                  {tab === "Cancelled" && analytics.cancelledBookings} */}
                 </span>
               </button>
             )
@@ -348,8 +356,8 @@ const Bookings: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      {/* Summary Cards - Only Total Revenue */}
+      <div className="gap-4 mb-6 max-w-screen-xl overflow-x-auto">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -359,32 +367,6 @@ const Bookings: React.FC = () => {
               <p className="text-sm text-gray-600">Total Revenue</p>
               <p className="text-xl font-bold text-gray-900">
                 ₹{analytics.totalRevenue.toLocaleString()}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <span className="text-orange-600 font-bold">₹</span>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Pending Dues</p>
-              <p className="text-xl font-bold text-gray-900">
-                {analytics.pendingPayments}
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white p-4 rounded-lg border border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-              <span className="text-red-600 font-bold">×</span>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Cancellations</p>
-              <p className="text-xl font-bold text-gray-900">
-                {analytics.cancelledBookings}
               </p>
             </div>
           </div>
@@ -438,8 +420,8 @@ const Bookings: React.FC = () => {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
-                  {isSelectionMode && (
+                {isSelectionMode && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
                     <input
                       type="checkbox"
                       checked={
@@ -449,8 +431,8 @@ const Bookings: React.FC = () => {
                       onChange={handleSelectAll}
                       className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
-                  )}
-                </th>
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   ID
                 </th>
@@ -490,7 +472,7 @@ const Bookings: React.FC = () => {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={isSelectionMode ? 12 : 11}
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     Loading...
@@ -499,7 +481,7 @@ const Bookings: React.FC = () => {
               ) : bookings.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={12}
+                    colSpan={isSelectionMode ? 12 : 11}
                     className="px-6 py-4 text-center text-gray-500"
                   >
                     No bookings found
@@ -517,16 +499,16 @@ const Bookings: React.FC = () => {
                     onTouchEnd={handleLongPressEnd}
                     onTouchCancel={handleLongPressEnd}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap w-12">
-                      {isSelectionMode && (
+                    {isSelectionMode && (
+                      <td className="px-6 py-4 whitespace-nowrap w-12">
                         <input
                           type="checkbox"
                           checked={selectedRows.includes(booking._id)}
                           onChange={() => handleRowSelection(booking._id)}
                           className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                         />
-                      )}
-                    </td>
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-medium text-blue-600">
                         {booking.bookingReference}
@@ -565,25 +547,29 @@ const Bookings: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap flex flex-col gap-1 text-center">
-                      <span className="text-sm text-gray-900">
-                        {booking.tickets?.length}
-                      </span>
-                      <span className="text-sm text-gray-900 bg-gray-200 px-2.5 py-0.5 rounded-full">
-                        used{" "}
-                        {
-                          booking.tickets?.filter((ticket) => ticket.isUsed)
-                            .length
-                        }
-                        /{booking.tickets?.length}
-                      </span>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col gap-1 text-center">
+                        <span className="text-sm text-gray-900">
+                          {booking.tickets?.length || 0}
+                        </span>
+                        <span className="text-sm text-gray-900 bg-gray-200 px-2.5 py-0.5 rounded-full">
+                          used{" "}
+                          {
+                            booking.tickets?.filter((ticket: any) => ticket.isUsed)
+                              .length || 0
+                          }
+                          /{booking.tickets?.length || 0}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           booking.channel === "bookmyshow"
                             ? "bg-purple-100 text-purple-800"
-                            : "bg-blue-100 text-blue-800"
+                            : booking.channel === "website"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-gray-100 text-gray-800"
                         }`}
                       >
                         {booking.channel
@@ -607,8 +593,6 @@ const Bookings: React.FC = () => {
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           booking.paymentStatus === "paid"
                             ? "bg-green-100 text-green-800"
-                            : booking.paymentStatus === "pending"
-                            ? "bg-orange-100 text-orange-800"
                             : booking.paymentStatus === "cancelled"
                             ? "bg-red-100 text-red-800"
                             : "bg-gray-100 text-gray-800"
@@ -624,6 +608,7 @@ const Bookings: React.FC = () => {
                         <button
                           onClick={() => navigate(`/bookings/${booking._id}`)}
                           className="text-gray-400 hover:text-gray-600"
+                          title="View"
                         >
                           <svg
                             className="w-4 h-4"
@@ -650,6 +635,7 @@ const Bookings: React.FC = () => {
                             navigate(`/bookings/edit/${booking._id}`)
                           }
                           className="text-gray-400 hover:text-gray-600"
+                          title="Edit"
                         >
                           <svg
                             className="w-4 h-4"
@@ -668,6 +654,7 @@ const Bookings: React.FC = () => {
                         <button
                           onClick={() => handleDelete(booking._id)}
                           className="text-red-400 hover:text-red-600"
+                          title="Delete"
                         >
                           <svg
                             className="w-4 h-4"
@@ -698,7 +685,7 @@ const Bookings: React.FC = () => {
         <button
           onClick={() => handlePageChange(pagination.currentPage - 1)}
           disabled={!pagination.hasPrevPage}
-          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50"
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
         >
           Previous
         </button>
@@ -708,7 +695,7 @@ const Bookings: React.FC = () => {
         <button
           onClick={() => handlePageChange(pagination.currentPage + 1)}
           disabled={!pagination.hasNextPage}
-          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50"
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
         >
           Next
         </button>

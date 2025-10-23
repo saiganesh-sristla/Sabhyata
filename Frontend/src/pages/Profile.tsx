@@ -111,65 +111,75 @@ const UserProfile = () => {
     loadUserData();
   }, [isAuthenticated, auth0User]);
 
-  const fetchBookings = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const userFromStorage = localStorage.getItem("user");
-      
-      if (!userFromStorage) {
-        console.error("No user found in localStorage");
-        return [];
-      }
-
-      const currentUser = JSON.parse(userFromStorage);
-      console.log("Fetching bookings for user:", currentUser);
-
-      const response = await axios.get(`${API_BASE_URL}/bookings`, {
-        params: { userId: currentUser.id },
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        withCredentials: true,
-      });
-      
-      console.log("Bookings API Response:", response.data);
-      
-      const data = response.data;
-      
-      // Handle different response structures
-      let bookingsArray = [];
-      
-      if (Array.isArray(data)) {
-        bookingsArray = data;
-      } else if (data && data.data && Array.isArray(data.data.bookings)) {
-        bookingsArray = data.data.bookings;
-      } else if (data && Array.isArray(data.bookings)) {
-        bookingsArray = data.bookings;
-      } else if (data && Array.isArray(data.data)) {
-        bookingsArray = data.data;
-      }
-      
-      console.log("Parsed bookings:", bookingsArray);
-      
-      // Filter bookings for current user AND only show confirmed/completed bookings
-      const filteredBookings = bookingsArray.filter(booking => {
-        const bookingUserId = booking.user?._id || booking.user?.id || booking.userId;
-        const isUserMatch = bookingUserId?.toString() === currentUser.id?.toString();
-        
-        // Only show confirmed or completed bookings
-        const status = booking.status?.toLowerCase() || '';
-        const isConfirmedOrCompleted = status === 'confirmed' || status === 'completed';
-        
-        console.log("Booking:", bookingUserId, "Status:", status, "User Match:", isUserMatch, "Status Match:", isConfirmedOrCompleted);
-        
-        return isUserMatch && isConfirmedOrCompleted;
-      });
-      
-      console.log("Filtered bookings (confirmed/completed only):", filteredBookings);
-      return filteredBookings;
-    } catch (err) {
-      console.error("Error fetching bookings:", err);
+const fetchBookings = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    const userFromStorage = localStorage.getItem("user");
+    
+    if (!userFromStorage) {
+      console.error("No user found in localStorage");
       return [];
     }
-  };
+
+    const currentUser = JSON.parse(userFromStorage);
+    console.log("Fetching bookings for user:", currentUser);
+
+    const response = await axios.get(`${API_BASE_URL}/bookings`, {
+      params: { userId: currentUser.id },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      withCredentials: true,
+    });
+    
+    console.log("Bookings API Response:", response.data);
+    
+    const data = response.data;
+    
+    // Handle different response structures
+    let bookingsArray = [];
+    
+    if (Array.isArray(data)) {
+      bookingsArray = data;
+    } else if (data && data.data && Array.isArray(data.data.bookings)) {
+      bookingsArray = data.data.bookings;
+    } else if (data && Array.isArray(data.bookings)) {
+      bookingsArray = data.bookings;
+    } else if (data && Array.isArray(data.data)) {
+      bookingsArray = data.data;
+    }
+    
+    console.log("Parsed bookings:", bookingsArray);
+    
+    // Filter bookings for current user (handle both user bookings and admin bookings)
+    const filteredBookings = bookingsArray.filter(booking => {
+      // Check user ID match (for regular bookings)
+      const bookingUserId = booking.user?._id || booking.user?.id || booking.userId;
+      const isUserMatch = bookingUserId?.toString() === currentUser.id?.toString();
+      
+      // Check contact info match (for admin bookings where user is null)
+      const contactEmail = booking.contactInfo?.email?.toLowerCase();
+      const currentUserEmail = currentUser.email?.toLowerCase();
+      const isContactMatch = contactEmail && currentUserEmail && contactEmail === currentUserEmail;
+      
+      // Match if either user ID matches OR contact email matches
+      const belongsToUser = isUserMatch || isContactMatch;
+      
+      // Only show confirmed or completed bookings
+      const status = booking.status?.toLowerCase() || '';
+      const isConfirmedOrCompleted = status === 'confirmed' || status === 'completed';
+      
+      console.log("Booking:", booking.bookingReference, "User Match:", isUserMatch, "Contact Match:", isContactMatch, "Status:", status);
+      
+      return belongsToUser && isConfirmedOrCompleted;
+    });
+    
+    console.log("Filtered bookings (confirmed/completed only):", filteredBookings);
+    return filteredBookings;
+  } catch (err) {
+    console.error("Error fetching bookings:", err);
+    return [];
+  }
+};
+
 
   useEffect(() => {
     const loadBookings = async () => {
@@ -323,14 +333,14 @@ const UserProfile = () => {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-sm text-gray-700 font-medium">Mobile Number</label>
-                    {isEditing !== "mobile" && (
+                    {/* {isEditing !== "mobile" && (
                       <button
                         onClick={() => handleEdit("mobile")}
                         className="text-red-500 text-sm flex items-center gap-1 hover:text-red-600"
                       >
                         <FaEdit size={14} /> Edit
                       </button>
-                    )}
+                    )} */}
                   </div>
                   {isEditing === "mobile" ? (
                     <form onSubmit={handleSubmit}>
@@ -370,14 +380,14 @@ const UserProfile = () => {
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-sm text-gray-700 font-medium">Email Address</label>
-                    {isEditing !== "email" && !isAuthenticated && (
+                    {/* {isEditing !== "email" && !isAuthenticated && (
                       <button
                         onClick={() => handleEdit("email")}
                         className="text-red-500 text-sm flex items-center gap-1 hover:text-red-600"
                       >
                         <FaEdit size={14} /> Edit
                       </button>
-                    )}
+                    )} */}
                   </div>
                   {isEditing === "email" ? (
                     <form onSubmit={handleSubmit}>
@@ -470,6 +480,7 @@ const UserProfile = () => {
                   )}
                   
                   <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                    {booking.type && <span>📋 {booking.type}</span>}
                     {booking.date && <span>📅 {formatDate(booking.date)}</span>}
                     {booking.createdAt && !booking.date && <span>📅 {formatDate(booking.createdAt)}</span>}
                     {booking.time && <span>🕒 {booking.time}</span>}

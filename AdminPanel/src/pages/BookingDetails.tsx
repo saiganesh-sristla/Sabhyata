@@ -253,29 +253,6 @@ const BookingDetails: React.FC = () => {
         </table>
       </div>
 
-      {/* Attendees Information */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Attendees</h2>
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket Type</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {booking.attendees?.map((attendee) => (
-              <tr key={attendee._id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{attendee.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {attendee.ticketType.charAt(0).toUpperCase() + attendee.ticketType.slice(1)}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
       {/* Notes */}
       {booking.notes && (
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">

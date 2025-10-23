@@ -8,6 +8,7 @@ interface User {
   name: string;
   email: string;
   phone: string;
+  role: string;
   isActive: boolean;
   isBlocked: boolean;
 }
@@ -15,6 +16,7 @@ interface User {
 const Users: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'All' | 'Active' | 'Blocked'>('All');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,6 +42,10 @@ const Users: React.FC = () => {
       } else if (activeTab === 'Blocked') {
         params.isBlocked = true;
       }
+      // Add role filter
+      if (roleFilter !== 'all') {
+        params.role = roleFilter;
+      }
 
       const response = await adminAPI.getUsers(params);
       console.log(response.data.data.users);
@@ -54,8 +60,8 @@ const Users: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchUsers(1); // Reset to page 1 on filter or search change
-  }, [searchQuery, activeTab]);
+    fetchUsers(1);
+  }, [searchQuery, activeTab, roleFilter]);
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
@@ -67,9 +73,9 @@ const Users: React.FC = () => {
     try {
       await adminAPI.toggleUserBlock(id, isBlocked);
       fetchUsers(pagination.currentPage);
-    } catch (err) {
-      if(err.response.data.message == "You cannot block yourself"){
-        return setError("You cannot block yourself")
+    } catch (err: any) {
+      if (err.response?.data?.message === "You cannot block yourself") {
+        return setError("You cannot block yourself");
       }
       console.error(`Failed to ${isBlocked ? 'block' : 'unblock'} user:`, err);
       setError(`Failed to ${isBlocked ? 'block' : 'unblock'} user. Please try again.`);
@@ -78,7 +84,7 @@ const Users: React.FC = () => {
 
   const handleResetOTP = async (id: string) => {
     try {
-      await adminAPI.resetUserOTP(id); // Note: This assumes an API endpoint; adjust as needed
+      await adminAPI.resetUserOTP(id);
       alert('OTP reset successfully');
     } catch (err) {
       console.error('Failed to reset OTP:', err);
@@ -96,18 +102,50 @@ const Users: React.FC = () => {
       } else if (activeTab === 'Blocked') {
         params.isBlocked = true;
       }
+      if (roleFilter !== 'all') {
+        params.role = roleFilter;
+      }
 
       const response = await adminAPI.exportUsers(params);
-      downloadFile(response, 'users_export.csv');
-    } catch (err) {
-      console.error('Failed to export users:', err);
-      setError('Failed to export users. Please try again.');
+      
+      console.log('Export response:', response);
+      
+      // Check if response is a blob with error (JSON wrapped in blob)
+      if (response.data instanceof Blob) {
+        // Check if it's actually a JSON error response
+        if (response.data.type === 'application/json') {
+          const text = await response.data.text();
+          const errorData = JSON.parse(text);
+          throw new Error(errorData.message || 'Export failed');
+        }
+        
+        // Valid CSV blob - proceed with download
+        const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        const fileName = `users_export_${new Date().toISOString().split('T')[0]}.csv`;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (err: any) {
+      console.error('Export error details:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to export users. Please try again.';
+      setError(errorMessage);
+      
+      // Show alert for better visibility
+      alert(`Export failed: ${errorMessage}`);
     }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className=" mx-auto">
+      <div className="mx-auto">
         {/* Header */}
         <div className="mb-6">
           <div className="flex justify-between items-start mb-2">
@@ -126,7 +164,7 @@ const Users: React.FC = () => {
         </div>
 
         {/* Search and Filters */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex justify-between items-center mb-4 space-y-4 md:space-y-0 flex-col md:flex-row gap-4">
           {/* Search Bar */}
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -139,28 +177,52 @@ const Users: React.FC = () => {
             />
           </div>
 
-          {/* Filter Tabs */}
-          <div className="flex bg-white border border-gray-200 rounded-lg p-1">
-            {(['All', 'Active', 'Blocked'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === tab
-                    ? 'bg-red-600 text-white shadow-sm'
-                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
-                }`}
+          {/* Filters Row */}
+          <div className="flex flex-wrap gap-4 items-center">
+             {/* Role Filter Dropdown */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700">Role:</label>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-300 bg-white"
               >
-                {tab} {tab === 'All' ? `(${pagination.totalCount})` : ''}
-              </button>
-            ))}
+                <option value="all">All Roles</option>
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+                <option value="staff">Staff</option>
+              </select>
+            </div>
+            
+            {/* Status Filter Tabs */}
+            <div className="flex bg-white border border-gray-200 rounded-lg p-1">
+              {(['All', 'Active', 'Blocked'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === tab
+                      ? 'bg-red-600 text-white shadow-sm'
+                      : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
+                  {tab} {tab === 'All' ? `(${pagination.totalCount})` : ''}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg text-sm">
-            {error}
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg text-sm flex items-start justify-between">
+            <span>{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-700 hover:text-red-900 font-bold ml-4"
+            >
+              ×
+            </button>
           </div>
         )}
 
@@ -169,9 +231,10 @@ const Users: React.FC = () => {
           {/* Table Header */}
           <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <div className="grid grid-cols-12 gap-4 text-xs font-medium text-gray-600 uppercase tracking-wide">
-              <div className="col-span-3">Name</div>
+              <div className="col-span-2">Name</div>
               <div className="col-span-3">Email</div>
               <div className="col-span-2">Phone</div>
+              <div className="col-span-1">Role</div>
               <div className="col-span-2">Status</div>
               <div className="col-span-2">Actions</div>
             </div>
@@ -188,18 +251,31 @@ const Users: React.FC = () => {
                 <div key={user._id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                   <div className="grid grid-cols-12 gap-4 items-center">
                     {/* Name */}
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       <div className="text-sm font-medium text-gray-900">{user.name}</div>
                     </div>
 
                     {/* Email */}
                     <div className="col-span-3">
-                      <div className="text-sm text-gray-600">{user.email}</div>
+                      <div className="text-sm text-gray-600">{user.email || 'Not available'}</div>
                     </div>
 
                     {/* Phone */}
                     <div className="col-span-2">
                       <div className="text-sm text-gray-600">{user.phone || 'Not available'}</div>
+                    </div>
+
+                    {/* Role */}
+                    <div className="col-span-1">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full capitalize ${
+                        user.role === 'admin' 
+                          ? 'bg-purple-100 text-purple-800'
+                          : user.role === 'staff'
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {user.role || 'user'}
+                      </span>
                     </div>
 
                     {/* Status */}
@@ -257,7 +333,7 @@ const Users: React.FC = () => {
             <button
               onClick={() => handlePageChange(pagination.currentPage - 1)}
               disabled={!pagination.hasPrevPage}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Previous
             </button>
@@ -267,7 +343,7 @@ const Users: React.FC = () => {
             <button
               onClick={() => handlePageChange(pagination.currentPage + 1)}
               disabled={!pagination.hasNextPage}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               Next
             </button>
