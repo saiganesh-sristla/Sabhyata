@@ -240,11 +240,11 @@ exports.createBooking = async (req, res) => {
     }
 
     console.log('Generated tickets:', generatedTickets.map(t => t.ticketId));
-
+    const event1 = await Event.findById(eventId);
     // ===== CREATE BOOKING WITH GENERATED TICKETS =====
     const booking = new Booking({
       bookingReference: bookingReference, // Use pre-generated reference
-      event: eventId,
+      event: event1,
       date: new Date(date),
       time,
       language: language || 'none',

@@ -135,8 +135,13 @@ const AdminBookingConfirmation = ({ bookingData, onClose }) => {
           <div className="border-l border-r border-gray-200 p-4">
             <div className="flex gap-3 mb-4">
               <img
-                src={bookingData?.event?.images?.[0] ? `https://sabhyata-foundation.onrender.com/${bookingData.event.images[0]}` : 'https://via.placeholder.com/80'}
+                src={
+                  bookingData?.event?.images?.[0]
+                    ? `https://sabhyata.onrender.com/${bookingData.event.images[0]}`
+                    : "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=80&h=80&fit=crop"
+                }
                 alt={eventName}
+                crossOrigin='anonymous'
                 className="w-16 h-16 object-cover rounded"
               />
               <div className="flex-1">
