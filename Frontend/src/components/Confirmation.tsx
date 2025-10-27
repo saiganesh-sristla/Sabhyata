@@ -456,15 +456,15 @@ export default function BookingConfirmation() {
                 </h3>
                 <div className="space-y-1 text-xs text-gray-600">
                   <div className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-red-500 mt-0.5" />
+                    <span>📍</span>
                     <span>{venue}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3 text-red-500 mt-0.5" />
+                    <span>📅</span>
                     <span>{eventDate}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-red-500 mt-0.5" />
+                    <span>🕒</span>
                     <span>{eventTime}</span>
                   </div>
                 </div>
