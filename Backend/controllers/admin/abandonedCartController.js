@@ -51,8 +51,12 @@ exports.createAbandonedCart = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    console.log("AbandonedCart returned:", cart);
+
+
     res.status(201).json({ success: true, data: cart });
   } catch (error) {
+     console.error("AbandonedCart save error", error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
