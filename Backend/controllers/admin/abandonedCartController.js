@@ -35,8 +35,22 @@ exports.createAbandonedCart = async (req, res) => {
   try {
     const { sessionId, event, tickets, totalAmount, contactInfo } = req.body;
 
+    console.log("Received abandoned cart request:", { sessionId, event, tickets, totalAmount, contactInfo });
+
     if (!sessionId) {
       return res.status(400).json({ success: false, message: 'Session ID required' });
+    }
+
+    if (!event) {
+      return res.status(400).json({ success: false, message: 'Event ID required' });
+    }
+
+    if (!tickets || tickets.length === 0) {
+      return res.status(400).json({ success: false, message: 'Tickets required' });
+    }
+
+    if (!totalAmount || totalAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Valid total amount required' });
     }
 
     const cart = await AbandonedCart.findOneAndUpdate(
@@ -51,8 +65,11 @@ exports.createAbandonedCart = async (req, res) => {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    console.log("AbandonedCart saved:", JSON.stringify(cart, null, 2));
+
     res.status(201).json({ success: true, data: cart });
   } catch (error) {
+     console.error("AbandonedCart save error", error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
