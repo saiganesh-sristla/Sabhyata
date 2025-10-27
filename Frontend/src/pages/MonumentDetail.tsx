@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   FaCalendarAlt,
+  FaRupeeSign,
 } from "react-icons/fa";
+import { Calendar, IndianRupee, Timer, TimerIcon, User, User2, User2Icon } from "lucide-react";
 
 const token = localStorage.getItem("token");
 const API_BASE_URL =
@@ -127,16 +129,17 @@ function MonumentDetail() {
                 {/* Details */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-gray-600 mb-4 py-4">
                   <div className="flex items-center gap-2">
-                    <FaCalendarAlt className="text-orange-500" />{" "}
+                    <TimerIcon className="text-brown-500" size={18} />{" "}
                     {event.duration} Hours
                   </div>
                   <div className="flex items-center gap-2">
-                    👥 {event.capacity} People
+                    <User className="text-orange-500" size={18} /> {event.capacity} People
                   </div>
                   <div className="flex items-center gap-2">
-                    💰 ₹{event.price}
+                    <FaRupeeSign className="text-gray-800" /> {event.price}
                   </div>
-                  <div className="flex items-center gap-2">📅 {startDate}</div>
+                  <div className="flex items-center gap-2">
+                    <FaCalendarAlt className="text-gray-500" /> {startDate}</div>
                 </div>
               </div>
 

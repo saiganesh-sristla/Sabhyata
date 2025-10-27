@@ -3,6 +3,7 @@ import { Html5QrcodeScanner } from "html5-qrcode";
 import { FaCheckCircle, FaTimesCircle, FaQrcode, FaCamera, FaUser, FaEnvelope, FaPhone, FaCalendar, FaClock, FaMapMarkerAlt, FaTicketAlt, FaChair } from "react-icons/fa";
 import axios from "axios";
 import { decryptQRData } from "../utils/qrEncryption";
+import { Lock, LockIcon } from "lucide-react";
 
 const Scanner = () => {
   const [scanResult, setScanResult] = useState(null);
@@ -405,7 +406,7 @@ const Scanner = () => {
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6">
           <div className="flex items-center gap-3 mb-2">
             <FaQrcode className="text-2xl sm:text-3xl text-blue-600" />
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">🔐 Encrypted QR Scanner</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900"> Encrypted QR Scanner</h1>
           </div>
           <p className="text-gray-600 text-xs sm:text-sm">
             Scan encrypted QR codes to verify tickets securely
@@ -491,7 +492,7 @@ const Scanner = () => {
         {/* Instructions */}
         {!scanResult && !ticketData && !loading && !error && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-            <h3 className="text-xs sm:text-sm font-semibold text-blue-900 mb-2">🔐 Security Instructions:</h3>
+            <h3 className="text-xs sm:text-sm font-semibold text-blue-900 mb-2 flex items-center gap-2"><LockIcon size={16}/> Security Instructions:</h3>
             <ul className="text-xs sm:text-sm text-blue-800 space-y-1">
               <li>• QR codes are AES-256 encrypted</li>
               <li>• Only authorized scanners can decrypt</li>

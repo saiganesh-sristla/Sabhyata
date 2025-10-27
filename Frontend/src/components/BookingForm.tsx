@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Minus, Plus, IndianRupee, Clock, MapPin, Languages, ChevronDown, Heart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,18 @@ import BookingBtn from "./ui/BookingBtn";
 import { AuthDialog } from "@/components/ui/AuthDialog";
 
 // Custom Dropdown Component (for Language only)
-const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter = (v: string) => v }: {
+const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter = (v: string) => v, getTimeForLang }: {
   value: string;
   onChange: (value: string) => void;
   options: string[];
   disabled: boolean;
   displayFormatter?: (value: string) => string;
+  getTimeForLang?: (lang: string) => string;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const displayValue = value ? displayFormatter(value) : "Select";
+  const displayTime = getTimeForLang ? getTimeForLang(value) : '';
+  const displayValue = value ? `${displayFormatter(value)} ${displayTime ? `at ${displayTime}` : ''}` : "Select";
 
   return (
     <div className="relative w-full">
@@ -48,24 +50,27 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
             {options.length === 0 ? (
               <div className="px-3 py-2 text-sm text-gray-500">No options available</div>
             ) : (
-              options.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => {
-                    onChange(option);
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
-                >
-                  <span className="text-sm font-medium text-gray-800">
-                    {displayFormatter(option)}
-                  </span>
-                  {value === option && (
-                    <Check className="w-4 h-4 text-heritage-burgundy" />
-                  )}
-                </button>
-              ))
+              options.map((option) => {
+                const optionTime = getTimeForLang ? getTimeForLang(option) : '';
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setIsOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
+                  >
+                    <span className="text-sm font-medium text-gray-800">
+                      {displayFormatter(option)} {optionTime ? `at ${optionTime}` : ''}
+                    </span>
+                    {value === option && (
+                      <Check className="w-4 h-4 text-heritage-burgundy" />
+                    )}
+                  </button>
+                );
+              })
             )}
           </div>
         </>
@@ -109,6 +114,9 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
   const token = localStorage.getItem("token");
 
   const isInactive = eventData?.status === "inactive";
+  const isConfigure = useMemo(() => eventData?.type === 'configure' || eventData?.configureSeats === true, [eventData]);
+  const isWalking = useMemo(() => eventData?.type === 'walking', [eventData]);
+  const showSeparateTime = !isConfigure || isWalking;
 
   const getScheduleForDate = useMemo(() => {
     return (dateStr: string) => {
@@ -122,7 +130,7 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
   }, [eventData]);
 
   const hasLanguageAvailable = useMemo(() => {
-    if (!formData.selectedDate) return false;
+    if (!formData.selectedDate || isWalking) return false;
     const schedule = getScheduleForDate(formData.selectedDate);
     if (!schedule || !schedule.timeSlots) return false;
     
@@ -144,7 +152,7 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
       }
       return true;
     });
-  }, [formData.selectedDate, eventData, getScheduleForDate]);
+  }, [formData.selectedDate, eventData, getScheduleForDate, isWalking]);
 
   const availableLanguages = useMemo(() => {
     if (!hasLanguageAvailable) return [];
@@ -173,6 +181,32 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
     
     return [...new Set(validTimeSlots.map((slot: any) => slot.lang))];
   }, [formData.selectedDate, eventData, getScheduleForDate, hasLanguageAvailable]);
+
+  const getTimeForLang = useCallback((lang: string) => {
+    const schedule = getScheduleForDate(formData.selectedDate);
+    if (!schedule) return '';
+    
+    const now = new Date();
+    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
+    
+    const validTimeSlot = schedule.timeSlots?.find((slot: any) => {
+      if (!slot.isLangAvailable || slot.lang !== lang) return false;
+      
+      if (isToday) {
+        const [hours, minutes] = slot.time.split(':').map(Number);
+        const slotTime = new Date(now);
+        slotTime.setHours(hours, minutes, 0, 0);
+        
+        const oneHourFromNow = new Date(now);
+        oneHourFromNow.setHours(now.getHours() + 1);
+        
+        return slotTime >= oneHourFromNow;
+      }
+      return true;
+    });
+    
+    return validTimeSlot?.time || '';
+  }, [formData.selectedDate, getScheduleForDate]);
 
   const selectedTime = useMemo(() => {
     const schedule = getScheduleForDate(formData.selectedDate);
@@ -826,7 +860,7 @@ const handleBook = () => {
                 </div>
               </div>
 
-              {formData.selectedDate && selectedTime && (
+              {showSeparateTime && formData.selectedDate && selectedTime && (
                 <div className="flex items-center space-x-1">
                   <Clock className="w-3 h-3 text-heritage-burgundy" />
                   <div>
@@ -847,6 +881,7 @@ const handleBook = () => {
                       options={availableLanguages}
                       disabled={!formData.selectedDate || !eventData || availableLanguages.length === 0 || isInactive}
                       displayFormatter={lang => languageMap[lang] || lang}
+                      getTimeForLang={isConfigure && !isWalking ? getTimeForLang : undefined}
                     />
                   </div>
                 </div>
@@ -904,7 +939,9 @@ const handleBook = () => {
                 <div className="flex items-center justify-between py-1 px-2 border border-heritage-burgundy/20 rounded-lg bg-white/50">
                   <div className="flex items-center space-x-1">
                     <p className="text-xs font-medium">Children</p>
-                    <span className="text-[10px] bg-red-500 text-white px-1 py-0 rounded font-medium">{eventData?.childDiscountPercentage || 10}% OFF</span>
+                    {eventData?.childDiscountPercentage > 0 && (
+                      <span className="text-[10px] bg-red-500 text-white px-1 py-0 rounded font-medium">{eventData.childDiscountPercentage}% OFF</span>
+                    )}
                   </div>
                   <div className="flex items-center space-x-1">
                     <Button
@@ -1062,7 +1099,7 @@ const handleBook = () => {
         </div>
       </div>
 
-      {formData.selectedDate && selectedTime && (
+      {showSeparateTime && formData.selectedDate && selectedTime && (
         <div className="flex items-start space-x-3 mb-2">
           <Clock className="w-5 h-5 text-heritage-burgundy mt-1 flex-shrink-0" />
           <div>
@@ -1083,6 +1120,7 @@ const handleBook = () => {
               options={availableLanguages}
               disabled={!formData.selectedDate || !eventData || availableLanguages.length === 0 || isInactive}
               displayFormatter={(lang) => languageMap[lang] || lang}
+              getTimeForLang={isConfigure && !isWalking ? getTimeForLang : undefined}
             />
           </div>
         </div>
@@ -1143,7 +1181,9 @@ const handleBook = () => {
         <div className="flex items-center justify-between py-3 px-4 border border-heritage-burgundy/20 rounded-lg bg-white/50">
           <div className="flex items-center space-x-2">
             <p className="font-medium text-foreground">Children</p>
-            <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-medium">{eventData?.childDiscountPercentage || 10}% OFF</span>
+            {eventData?.childDiscountPercentage > 0 && (
+              <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-medium">{eventData.childDiscountPercentage}% OFF</span>
+            )}
           </div>
           <div className="flex items-center space-x-3">
             <Button

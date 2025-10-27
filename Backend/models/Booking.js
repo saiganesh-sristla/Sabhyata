@@ -139,7 +139,7 @@ const bookingSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     enum: ['card', 'upi', 'netbanking', 'wallet', 'razorpay', 'cash', null]
-  },
+  }, 
   notes: {
     type: String
   },

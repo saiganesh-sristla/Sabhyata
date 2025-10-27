@@ -862,7 +862,9 @@ exports.getAllBookings = async (req, res) => {
       event,
       startDate,
       endDate,
+      eventDate,
       channel,
+      paymentMethod,
       eventDateFilter,
       currentDate,
       bookingType
@@ -870,17 +872,29 @@ exports.getAllBookings = async (req, res) => {
 
     const query = {};
 
-    // ✅ If userId is passed in params, filter bookings by user
+    // If userId is passed in params, filter bookings by user
     if (req.params.userId) {
       query.user = req.params.userId;
     }
 
-    // Search filter
+    // Search filter - expanded to include phone, event name
     if (search) {
+      // First get matching events
+      const matchingEvents = await Event.find({
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { venue: { $regex: search, $options: "i" } }
+        ]
+      }).select('_id');
+      
+      const eventIds = matchingEvents.map(e => e._id);
+      
       query.$or = [
         { bookingReference: { $regex: search, $options: "i" } },
         { "contactInfo.name": { $regex: search, $options: "i" } },
         { "contactInfo.email": { $regex: search, $options: "i" } },
+        { "contactInfo.phone": { $regex: search, $options: "i" } },
+        { event: { $in: eventIds } }
       ];
     }
 
@@ -888,14 +902,40 @@ exports.getAllBookings = async (req, res) => {
     if (status) query.status = status.toLowerCase();
     if (paymentStatus) query.paymentStatus = paymentStatus.toLowerCase();
     if (event) query.event = event;
-    if (channel) query.channel = channel.toLowerCase();
+    if (channel) query.bookingType = channel.toLowerCase() === 'manual' ? 'admin' : channel.toLowerCase();
+    if (paymentMethod) {
+     // Accept synonyms for UPI
+     const val = paymentMethod.toLowerCase();
+     const allUpiMethods = ['upi', 'razorpay']; // Add more if needed
+     if (allUpiMethods.includes(val)) {
+     query.paymentMethod = { $in: allUpiMethods };
+     } else {
+     query.paymentMethod = val;
+    }
+    }
+
     if (bookingType) query.bookingType = bookingType.toLowerCase();
 
     // Date range filter (booking creation date)
     if (startDate && endDate) {
       query.createdAt = {
         $gte: new Date(startDate),
-        $lte: new Date(endDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
+      };
+    } else if (startDate) {
+      query.createdAt = { $gte: new Date(startDate) };
+    } else if (endDate) {
+      query.createdAt = { $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)) };
+    }
+
+    // Single event date filter
+    if (eventDate) {
+      const dateStart = new Date(eventDate);
+      const dateEnd = new Date(eventDate);
+      dateEnd.setHours(23, 59, 59, 999);
+      query.date = {
+        $gte: dateStart,
+        $lte: dateEnd
       };
     }
 

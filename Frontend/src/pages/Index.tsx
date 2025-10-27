@@ -43,7 +43,7 @@ const MonumentSkeleton = () => (
       </div>
 
       {/* Upcoming Events */}
-      <div className="h-4 bg-gray-200 rounded w-1/3 mt-2"></div>
+      {/* <div className="h-4 bg-gray-200 rounded w-1/3 mt-2"></div> */}
 
       {/* Button */}
       <div className="h-10 bg-gray-300 rounded-md mt-4"></div>
@@ -67,7 +67,7 @@ function MonumentList() {
 
   const fetchMonuments = async () => {
     setLoading(true);
-    let url = `${API_BASE_URL}/monuments?page=${page}&limit=20`;
+    let url = `${API_BASE_URL}/monuments?page=${page}&limit=20&status=active`;
     if (period !== "all")
       url += `&establishmentEra=${encodeURIComponent(period)}`;
     if (experience !== "all")
@@ -177,10 +177,10 @@ function MonumentList() {
                   </div>
 
                   {/* Upcoming Events */}
-               <div className="mt-2 flex items-center text-sm text-orange-600">
+               {/* <div className="mt-2 flex items-center text-sm text-orange-600">
   <FaCalendarAlt className="mr-1" />
   Upcoming Event{m.events?.length === 0 ? "" : "s"}: {m.events?.length || 0}
-</div>
+</div> */}
 
 
                   {/* Explore Button */}
