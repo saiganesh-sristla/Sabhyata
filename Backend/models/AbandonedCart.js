@@ -16,6 +16,12 @@ const abandonedCartSchema = new mongoose.Schema({
       enum: ['adult', 'child'],
       required: true
     },
+    quantity: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1
+    },
     price: {
       type: Number,
       required: true,

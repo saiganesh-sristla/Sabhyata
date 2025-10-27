@@ -246,6 +246,7 @@ useEffect(() => {
         };
 
         console.log('Creating abandoned cart:', abandonedCartPayload);
+        console.log('Tickets detail:', JSON.stringify(tickets, null, 2));
 
         const response = await fetch(`${API_BASE_URL}/abandoned-carts/`, {
           method: 'POST',
