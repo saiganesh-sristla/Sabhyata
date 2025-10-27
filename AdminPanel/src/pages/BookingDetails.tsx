@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { adminAPI } from '../utils/api'; // Import centralized API client
+import { adminAPI } from '../utils/api';
+import AdminBookingConfirmation from '../pages/AdminBookingConfirmation'; // Import modal
 
 interface Booking {
   _id: string;
@@ -8,7 +9,11 @@ interface Booking {
   event: {
     name: string;
     venue: string;
-    dateTime: { start: string };
+    dateTime?: { start: string };
+    duration?: number;
+    images?: string[];
+    type?: 'walking' | 'configure';
+    configureSeats?: boolean;
     _id: string;
   };
   contactInfo: {
@@ -18,14 +23,18 @@ interface Booking {
   };
   tickets: Array<{
     _id: string;
-    type: 'adult' | 'child';
+    ticketId?: string;
+    type: 'adult' | 'child' | 'foreigner';
     price: number;
+    isUsed?: boolean;
   }>;
-  attendees: Array<{
-    name: string;
-    ticketType: 'adult' | 'child';
-    _id: string;
+  seats?: Array<{
+    seatId?: string;
+    row?: string;
+    number?: number;
   }>;
+  date?: string;
+  time?: string;
   paymentMethod: string | null;
   paymentStatus: 'paid' | 'pending' | 'cancelled';
   status: 'pending' | 'confirmed' | 'cancelled';
@@ -41,6 +50,7 @@ const BookingDetails: React.FC = () => {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTicket, setShowTicket] = useState(false); // For modal
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -53,11 +63,11 @@ const BookingDetails: React.FC = () => {
       try {
         setLoading(true);
         const response = await adminAPI.getBookingById(id);
-        console.log(response.data.data)
+        console.log('Booking Data:', response.data.data);
         setBooking(response.data.data);
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch booking details:', err);
-        setError('Failed to load booking details');
+        setError(err.response?.data?.message || 'Failed to load booking details');
       } finally {
         setLoading(false);
       }
@@ -82,9 +92,10 @@ const BookingDetails: React.FC = () => {
     );
   }
 
-  const adultTickets = booking.tickets.filter((ticket) => ticket.type === 'adult').length;
-  const childTickets = booking.tickets.filter((ticket) => ticket.type === 'child').length;
-  
+  const adultTickets = booking.tickets.filter((t) => t.type === 'adult').length;
+  const childTickets = booking.tickets.filter((t) => t.type === 'child').length;
+  const foreignerTickets = booking.tickets.filter((t) => t.type === 'foreigner').length;
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
@@ -163,7 +174,9 @@ const BookingDetails: React.FC = () => {
           <div>
             <p className="text-sm text-gray-600">Event Date & Time</p>
             <p className="text-gray-900 font-medium">
-              {new Date(booking.event.dateTime?.start).toLocaleString()}
+              {booking.date && booking.time
+                ? `${new Date(booking.date).toLocaleDateString()} at ${booking.time}`
+                : 'N/A'}
             </p>
           </div>
         </div>
@@ -175,15 +188,15 @@ const BookingDetails: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <p className="text-sm text-gray-600">Name</p>
-            <p className="text-gray-900 font-medium">{booking.contactInfo?.name}</p>
+            <p className="text-gray-900 font-medium">{booking.contactInfo.name}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Email</p>
-            <p className="text-gray-900 font-medium">{booking.contactInfo?.email}</p>
+            <p className="text-gray-900 font-medium">{booking.contactInfo.email}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Phone</p>
-            <p className="text-gray-900 font-medium">{booking.contactInfo?.phone}</p>
+            <p className="text-gray-900 font-medium">{booking.contactInfo.phone}</p>
           </div>
         </div>
       </div>
@@ -221,34 +234,68 @@ const BookingDetails: React.FC = () => {
 
       {/* Tickets Information */}
       <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Tickets</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Tickets</h2>
+          <button
+            onClick={() => setShowTicket(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2"
+          >
+            Show Ticket
+          </button>
+        </div>
+
         <div className="mb-4">
           <p className="text-sm text-gray-600">Total Tickets: {booking.tickets.length}</p>
           <p className="text-sm text-gray-600">
-            Adult Tickets: {adultTickets} (₹{booking.tickets.find((t) => t.type === 'adult')?.price || 0} each)
-          </p>
-          <p className="text-sm text-gray-600">
-            Child Tickets: {childTickets} (₹{booking.tickets.find((t) => t.type === 'child')?.price || 0} each)
+            Adult: {adultTickets} | Child: {childTickets} | Foreigner: {foreignerTickets}
           </p>
         </div>
+
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ticket ID
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Type
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Price
+              </th>
+              {booking.seats && booking.seats.length > 0 && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Seat
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {booking.tickets?.map((ticket) => (
-              <tr key={ticket._id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{ticket._id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">₹{ticket.price.toLocaleString()}</td>
-              </tr>
-            ))}
+            {booking.tickets.map((ticket, index) => {
+              const seat = booking.seats?.[index];
+              const seatLabel = seat
+                ? seat.seatId || `${seat.row}${seat.number}` || 'N/A'
+                : '-';
+
+              return (
+                <tr key={ticket._id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {ticket.ticketId || ticket._id}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    ₹{ticket.price.toLocaleString()}
+                  </td>
+                  {booking.seats && booking.seats.length > 0 && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {seatLabel}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -259,6 +306,14 @@ const BookingDetails: React.FC = () => {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Notes</h2>
           <p className="text-sm text-gray-600">{booking.notes}</p>
         </div>
+      )}
+
+      {/* Ticket Modal */}
+      {showTicket && booking && (
+        <AdminBookingConfirmation
+          bookingData={booking}
+          onClose={() => setShowTicket(false)}
+        />
       )}
     </div>
   );
