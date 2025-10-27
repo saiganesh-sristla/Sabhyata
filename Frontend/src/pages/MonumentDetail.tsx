@@ -23,7 +23,8 @@ function MonumentDetail() {
         });
         const data = await res.json();
         if (data.success) {
-          setEvents(data.data);
+          const filteredEvents = data.data.filter((event: any) => event.status !== "draft");
+          setEvents(filteredEvents);
         } else {
           console.error("API Error:", data.message);
         }
