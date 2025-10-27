@@ -75,6 +75,8 @@ export const adminAPI = {
 
   getBookingById: (id: string) => apiClient.get(`/admin/bookings/${id}`),
 
+  getSeatLayout: (eventId, params) => apiClient.get(`/admin/seat-layouts/${eventId}`, { params }),
+
   createBooking: (data: any) => apiClient.post("/admin/bookings", data),
 
   updateBookingStatus: (id: string, data: any) =>
