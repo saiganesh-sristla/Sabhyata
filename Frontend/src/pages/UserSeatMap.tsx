@@ -1183,8 +1183,15 @@ const handleProceed = async () => {
                 <p className="flex items-center gap-2 text-sm">
                   <Calendar size={14} />
                   {selectedDate ? new Date(selectedDate).toLocaleDateString() : "N/A"}
-                  <Clock size={14} />
-                  {selectedTime || "N/A"}
+                 <Clock size={14} />
+{selectedTime
+  ? new Date(`1970-01-01T${selectedTime}:00`).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+  : "N/A"}
+
                   <LocateFixedIcon size={14} />
                   {eventData?.venue || "N/A"}
                 </p>

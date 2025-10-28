@@ -5,6 +5,7 @@ import { useAuth0 } from "@auth0/auth0-react";
 import { toast } from "@/components/ui/sonner";
 import { AuthDialog } from "@/components/ui/AuthDialog";
 
+
 const getDeviceId = async () => {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
@@ -15,6 +16,7 @@ const getDeviceId = async () => {
   }
   const canvasHash = canvas.toDataURL();
 
+
   const components = [
     navigator.userAgent,
     navigator.language,
@@ -23,6 +25,7 @@ const getDeviceId = async () => {
     canvasHash,
   ];
 
+
   const data = components.join('###');
   const buffer = new TextEncoder().encode(data);
   const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
@@ -30,11 +33,13 @@ const getDeviceId = async () => {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
+
 export default function BookingPaymentForm() {
   const { id: bookingId } = useParams(); 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams(); // ✅ Get query params
   const { isAuthenticated, loginWithRedirect, isLoading: authLoading } = useAuth0();
+
 
   const [bookingData, setBookingData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,18 +56,21 @@ export default function BookingPaymentForm() {
     phone: "",
   });
   const [specialNotes, setSpecialNotes] = useState("");
-  const [timer, setTimer] = useState(300);
+  const [timer, setTimer] = useState(600);
   const [showTimeout, setShowTimeout] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [authDialogOpen, setAuthDialogOpen] = useState(false);
+  const [acceptTc, setAcceptTc] = useState(false);
   const hasCreatedAbandonedCart = useRef(false); // Flag to ensure only once
+
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sabhyata.onrender.com/api";
   
   // ✅ Check if this is a walking tour
 const isWalkingTour = searchParams.has('eventId');
   const token = localStorage.getItem("token");
+
 
   // Initialize device ID and session ID
   useEffect(() => {
@@ -79,15 +87,18 @@ const isWalkingTour = searchParams.has('eventId');
     initialize();
   }, [bookingData]);
 
+
 // ✅ Fetch booking data OR load from query params
 useEffect(() => {
   const fetchOrLoadBooking = async () => {
     try {
       setLoading(true);
 
+
       console.log('bookingId:', bookingId);
       console.log('isWalkingTour:', isWalkingTour);
       console.log('searchParams:', Object.fromEntries(searchParams));
+
 
       // ✅ WALKING TOUR - Get data from query params
       if (isWalkingTour) {
@@ -100,11 +111,14 @@ useEffect(() => {
         const isForeigner = searchParams.get('isForeigner') === 'true';
         const totalAmount = parseFloat(searchParams.get('totalAmount') || '0');
 
+
         console.log('Walking tour params:', { eventId, adults, children, date, time, totalAmount });
+
 
         if (!eventId) {
           throw new Error('Missing event information');
         }
+
 
         // Fetch event details
         const eventResponse = await fetch(`${API_BASE_URL}/events/${eventId}`, {
@@ -113,13 +127,24 @@ useEffect(() => {
           },
         });
 
+
         const eventData = await eventResponse.json();
+
 
         if (!eventData.success) {
           throw new Error('Failed to fetch event details');
         }
 
+
         console.log('Event data loaded:', eventData.data.name);
+
+
+        // Generate temp booking reference
+        const generateTempId = () => {
+          const timestamp = Date.now();
+          const randomHex = Math.random().toString(16).substr(2, 8).toUpperCase();
+          return `ID-${timestamp}-${randomHex}`;
+        };
 
         // Create booking-like object
         setBookingData({
@@ -131,20 +156,23 @@ useEffect(() => {
           totalAmount: totalAmount,
           language: language,
           isForeigner: isForeigner,
-          bookingReference: 'PENDING',
+          bookingReference: generateTempId(),
           seats: [],
           status: 'pending',
           paymentStatus: 'pending'
         });
 
+
         setLoading(false);
         return;
       }
+
 
       // ✅ SEATED EVENT - Fetch existing temp booking
       if (bookingId) {
         const dId = await getDeviceId();
         const sid = localStorage.getItem('currentSessionId') || dId;
+
 
         const response = await fetch(
           `${API_BASE_URL}/bookings/${bookingId}?deviceId=${dId}&sessionId=${sid}`,
@@ -155,7 +183,9 @@ useEffect(() => {
           }
         );
 
+
         const data = await response.json();
+
 
         if (data.success) {
           setBookingData(data.data);
@@ -178,9 +208,11 @@ useEffect(() => {
         return;
       }
 
+
       // ✅ If we reach here, something is wrong but don't throw - let it fail gracefully
       console.error('No valid booking data found');
       setLoading(false);
+
 
     } catch (err) {
       console.error('Fetch booking error:', err);
@@ -195,13 +227,16 @@ useEffect(() => {
     }
   };
 
+
   fetchOrLoadBooking();
 }, [bookingId, isWalkingTour, searchParams, navigate, API_BASE_URL, token]);
+
 
   // ✅ Create abandoned cart on load (only once, after bookingData is ready)
   useEffect(() => {
     const createAbandonedCart = async () => {
       if (!bookingData || !sessionId || hasCreatedAbandonedCart.current) return;
+
 
       try {
         // Construct tickets array
@@ -237,6 +272,7 @@ useEffect(() => {
           }
         }
 
+
         const abandonedCartPayload = {
           sessionId,
           event: bookingData.event._id,
@@ -245,8 +281,10 @@ useEffect(() => {
           contactInfo: contactInfo // Initial empty, can be updated later if needed
         };
 
+
         console.log('Creating abandoned cart:', abandonedCartPayload);
         console.log('Tickets detail:', JSON.stringify(tickets, null, 2));
+
 
         const response = await fetch(`${API_BASE_URL}/abandoned-carts/`, {
           method: 'POST',
@@ -257,7 +295,9 @@ useEffect(() => {
           body: JSON.stringify(abandonedCartPayload)
         });
 
+
         const data = await response.json();
+
 
         if (data.success) {
           console.log('Abandoned cart created/updated:', data.data._id);
@@ -270,13 +310,16 @@ useEffect(() => {
       }
     };
 
+
     createAbandonedCart();
   }, [bookingData, sessionId, isWalkingTour, contactInfo, API_BASE_URL]);
+
 
   // Fetch user data and auto-fill
   useEffect(() => {
     const fetchUserData = async () => {
       if (!token) return;
+
 
       try {
         const res = await fetch(`${API_BASE_URL}/auth/me`, {
@@ -303,26 +346,32 @@ useEffect(() => {
       }
     };
 
+
     if (token) {
       fetchUserData();
     }
   }, [token, API_BASE_URL]);
 
+
   // Countdown timer - only for seated events
   useEffect(() => {
     if (isWalkingTour) return; // ✅ No timer for walking tours
+
 
     if (timer <= 0) {
       setShowTimeout(true);
       return;
     }
 
+
     const interval = setInterval(() => {
       setTimer((prev) => prev - 1);
     }, 1000);
 
+
     return () => clearInterval(interval);
   }, [timer, isWalkingTour]);
+
 
   const handleContactChange = (field, value) => {
     if (field === "phone") {
@@ -347,19 +396,23 @@ useEffect(() => {
     }
   };
 
+
   const handleSpecialNotesChange = (e) => {
     setSpecialNotes(e.target.value);
   };
+
 
   const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email) ? "" : "Please enter a valid email address";
   };
 
+
   const validatePhone = (phone) => {
     const phoneRegex = /^\+91\s\d{10}$/;
     return phoneRegex.test(phone) ? "" : "Please enter a valid 10-digit phone number";
   };
+
 
   const loadRazorpay = () => {
     return new Promise((resolve) => {
@@ -371,6 +424,7 @@ useEffect(() => {
     });
   };
 
+
   const handlePayment = async () => {
     // Check authentication
     if (!token) {
@@ -378,31 +432,38 @@ useEffect(() => {
       return;
     }
 
+
     // Validate form
     if (!contactInfo.name.trim()) {
       toast.error("Please enter your name");
       return;
     }
 
+
     if (formErrors.email) {
       toast.error("Please enter a valid email");
       return;
     }
+
 
     if (formErrors.phone) {
       toast.error("Please enter a valid phone number");
       return;
     }
 
+
     try {
       setIsPaying(true);
+
 
       const isLoaded = await loadRazorpay();
       if (!isLoaded) {
         throw new Error('Failed to load Razorpay SDK');
       }
 
+
       console.log('Creating order...');
+
 
       // ✅ Build payload based on event type
       const orderPayload = isWalkingTour ? {
@@ -423,7 +484,9 @@ useEffect(() => {
         specialNotes: specialNotes
       };
 
+
       console.log('Order payload:', orderPayload);
+
 
       const orderResponse = await fetch(`${API_BASE_URL}/payments/create-order`, {
         method: 'POST',
@@ -434,13 +497,17 @@ useEffect(() => {
         body: JSON.stringify(orderPayload)
       });
 
+
       const orderData = await orderResponse.json();
+
 
       if (!orderData.success) {
         throw new Error(orderData.message || 'Failed to create order');
       }
 
+
       console.log('Order created:', orderData.data.orderId);
+
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID,
@@ -452,6 +519,7 @@ useEffect(() => {
         handler: async function (response) {
           try {
             console.log('Payment successful, verifying...', response);
+
 
             // ✅ Verify payment with appropriate data
             const verifyPayload = isWalkingTour ? {
@@ -476,6 +544,7 @@ useEffect(() => {
               specialNotes: specialNotes
             };
 
+
             const verifyResponse = await fetch(`${API_BASE_URL}/payments/verify`, {
               method: 'POST',
               headers: {
@@ -485,16 +554,21 @@ useEffect(() => {
               body: JSON.stringify(verifyPayload)
             });
 
+
             const verifyData = await verifyResponse.json();
+
 
             if (verifyData.success) {
               toast.success("Payment successful! Redirecting to confirmation...");
 
+
               localStorage.removeItem('currentSessionId');
+
 
               const redirectReference = verifyData.data?.bookingReference || bookingData.bookingReference;
               
               console.log('Redirecting to:', redirectReference);
+
 
               setTimeout(() => {
                 navigate(`/bookings/${redirectReference}`);
@@ -502,6 +576,7 @@ useEffect(() => {
             } else {
               throw new Error(verifyData.message || 'Payment verification failed');
             }
+
 
           } catch (error) {
             console.error('Payment verification error:', error);
@@ -525,8 +600,10 @@ useEffect(() => {
         }
       };
 
+
       const rzp = new (window as any).Razorpay(options);
       rzp.open();
+
 
     } catch (error) {
       console.error('Payment error:', error);
@@ -535,10 +612,12 @@ useEffect(() => {
     }
   };
 
+
   const handleRedirect = () => {
     setShowTimeout(false);
     navigate("/");
   };
+
 
   if (authLoading || loading) {
     return (
@@ -547,6 +626,7 @@ useEffect(() => {
       </div>
     );
   }
+
 
   if (isPaying) {
     return (
@@ -558,6 +638,7 @@ useEffect(() => {
       </div>
     );
   }
+
 
   if (error) {
     return (
@@ -575,6 +656,7 @@ useEffect(() => {
     );
   }
 
+
   if (!bookingData) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -582,6 +664,7 @@ useEffect(() => {
       </div>
     );
   }
+
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
@@ -592,13 +675,23 @@ useEffect(() => {
     });
   };
 
+  const formatTime = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':');
+    const hour = parseInt(hours);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
+  };
+
   const formatTimer = (sec) => {
     const min = Math.floor(sec / 60).toString().padStart(2, "0");
     const s = (sec % 60).toString().padStart(2, "0");
     return `${min}:${s}`;
   };
 
-  const progress = (timer / 300) * 100;
+
+  const progress = (timer / 600) * 100;
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -621,6 +714,7 @@ useEffect(() => {
               }}
             />
 
+
             <h3 className="font-semibold text-gray-900 mb-2">{bookingData.event.name}</h3>
             <p className="text-sm text-gray-600 mb-4">Booking ID: {bookingData.bookingReference}</p>
             <div className="space-y-2 text-sm text-gray-600">
@@ -634,7 +728,7 @@ useEffect(() => {
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-red-500" />
-                <span>{bookingData.time}</span>
+                <span>{formatTime(bookingData.time)}</span>
               </div>
               {bookingData.seats && bookingData.seats.length > 0 && (
                 <div className="flex items-center gap-2">
@@ -669,6 +763,7 @@ useEffect(() => {
           </div>
         </div>
 
+
         {/* Payment Form */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6">
           {/* ✅ Show timer only for seated events */}
@@ -676,13 +771,14 @@ useEffect(() => {
             <div className="mb-6">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Time to complete payment</span>
-                <span className="text-sm font-medium">{formatTimer(timer)} / 05:00</span>
+                <span className="text-sm font-medium">{formatTimer(timer)} / 10:00</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div className="bg-red-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${progress}%` }}></div>
               </div>
             </div>
           )}
+
 
           <div className="mb-8">
             <h3 className="text-lg font-semibold mb-4">Contact Details</h3>
@@ -749,6 +845,7 @@ useEffect(() => {
               </div>
             </div>
 
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Special Notes</label>
               <textarea
@@ -761,6 +858,7 @@ useEffect(() => {
               />
             </div>
           </div>
+
 
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
@@ -791,9 +889,25 @@ useEffect(() => {
             <p className="text-xs text-gray-500 mt-2">All payment methods supported via Razorpay</p>
           </div>
 
+
           <div className="flex items-center gap-2 mb-6 text-sm text-green-600">
             <Shield className="w-4 h-4" />
             <span>Your payment information is secured with 256-bit SSL encryption</span>
+          </div>
+
+          {/* ✅ T&C Checkbox */}
+          <div className="flex items-start gap-2 mb-4">
+            <input
+              type="checkbox"
+              id="tc"
+              checked={acceptTc}
+              onChange={(e) => setAcceptTc(e.target.checked)}
+              className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+              disabled={isPaying}
+            />
+            <label htmlFor="tc" className="text-sm text-gray-600 cursor-pointer select-none">
+              I accept the <a href="/terms" className="text-red-600 hover:underline">Terms & Conditions</a> *
+            </label>
           </div>
 
           {/* ✅ Conditional Button - Auth Check */}
@@ -813,7 +927,8 @@ useEffect(() => {
                 Boolean(formErrors.email) || 
                 Boolean(formErrors.phone) || 
                 isPaying || 
-                !contactInfo.name.trim()
+                !contactInfo.name.trim() ||
+                !acceptTc
               }
               className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
             >
@@ -823,6 +938,7 @@ useEffect(() => {
           )}
         </div>
       </div>
+
 
       {showTimeout && !isWalkingTour && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -840,6 +956,7 @@ useEffect(() => {
           </div>
         </div>
       )}
+
 
       {/* ✅ Auth Dialog */}
       <AuthDialog

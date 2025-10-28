@@ -263,7 +263,7 @@ exports.createBooking = async (req, res) => {
       deviceId: req.body.deviceId || sessionId,
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.headers['user-agent'],
-      expiresAt: status === 'pending' ? new Date(Date.now() + 5 * 60 * 1000) : null, // 5 min expiry for pending
+      expiresAt: status === 'pending' ? new Date(Date.now() + 10 * 60 * 1000) : null, // 10 min expiry for pending
       bookingType,
       user: userId
     });

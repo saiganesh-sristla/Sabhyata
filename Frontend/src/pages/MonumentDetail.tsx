@@ -129,17 +129,17 @@ function MonumentDetail() {
                 {/* Details */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm text-gray-600 mb-4 py-4">
                   <div className="flex items-center gap-2">
-                    <TimerIcon className="text-brown-500" size={18} />{" "}
+                    <TimerIcon className="text-[#8B1538]" size={18} />{" "}
                     {event.duration} Hours
                   </div>
                   <div className="flex items-center gap-2">
-                    <User className="text-orange-500" size={18} /> {event.capacity} People
+                    <User className="text-[#8B1538]" size={18} /> {event.capacity} People
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaRupeeSign className="text-gray-800" /> {event.price}
+                    <FaRupeeSign className="text-[#8B1538]" /> {event.price}
                   </div>
                   <div className="flex items-center gap-2">
-                    <FaCalendarAlt className="text-gray-500" /> {startDate}</div>
+                    <FaCalendarAlt className="text-[#8B1538]" /> {startDate}</div>
                 </div>
               </div>
 

@@ -23,8 +23,18 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  const formatTime12Hour = (time) => {
+    if (!time) return '';
+    const date = new Date(`1970-01-01T${time}:00`);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
   const displayTime = getTimeForLang ? getTimeForLang(value) : '';
-  const displayValue = value ? `${displayFormatter(value)} ${displayTime ? `at ${displayTime}` : ''}` : "Select";
+  const displayValue = value
+  ? `${displayFormatter(value)} ${displayTime ? `at ${formatTime12Hour(displayTime)}` : ''}`
+  : "Select";
+
+
 
   return (
     <div className="relative w-full">
@@ -53,22 +63,22 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
               options.map((option) => {
                 const optionTime = getTimeForLang ? getTimeForLang(option) : '';
                 return (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      onChange(option);
-                      setIsOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
-                  >
-                    <span className="text-sm font-medium text-gray-800">
-                      {displayFormatter(option)} {optionTime ? `at ${optionTime}` : ''}
-                    </span>
-                    {value === option && (
-                      <Check className="w-4 h-4 text-heritage-burgundy" />
-                    )}
-                  </button>
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => {
+                    onChange(option);
+                    setIsOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
+                >
+                  <span className="text-sm font-medium text-gray-800">
+                    {displayFormatter(option)} {optionTime ? `at ${formatTime12Hour(optionTime)}` : ''}
+                  </span>
+                  {value === option && (
+                    <Check className="w-4 h-4 text-heritage-burgundy" />
+                  )}
+                </button>
                 );
               })
             )}
@@ -292,6 +302,31 @@ useEffect(() => {
           return;
         }
       } else if (isConfigure) {
+        
+        // ✅ For configure: Call seat-layouts endpoint and use available_seats
+        const seatResponse = await fetch(
+          `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || 'none'}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        
+        const seatData = await seatResponse.json();
+
+  const response = await fetch(
+          `${API_BASE_URL}/events/${eventId}/remaining-capacity?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
         // ✅ First, trigger manual cleanup to release any expired locks
         try {
           await fetch(`${API_BASE_URL}/temp-bookings/test-cleanup`, {
@@ -305,17 +340,6 @@ useEffect(() => {
           console.warn('Cleanup trigger failed (non-critical):', cleanupError);
         }
 
-        // ✅ For configure: Call seat-layouts endpoint and use available_seats
-        const seatResponse = await fetch(
-          `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const seatData = await seatResponse.json();
 
         if (seatData.success) {
           remaining = seatData.data.seatLayout.available_seats; // Direct from response

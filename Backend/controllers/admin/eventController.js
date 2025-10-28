@@ -2,6 +2,7 @@ const Event = require('../../models/Event');
 const Monument = require('../../models/Monument');
 const Booking = require('../../models/Booking');
 const SeatLayout = require('../../models/SeatLayout');
+const ShowSeatLayout = require('../../models/ShowSeatLayout');
 mongoose = require('mongoose');
 
 // Helper function to convert YouTube watch URL to embed URL
@@ -517,19 +518,47 @@ exports.getRemainingCapacity = async (req, res) => {
       const bookedCount = await Booking.countDocuments(query);
       remaining = event.capacity - bookedCount;
     } else if (isConfigureEvent) {
-      // ✅ Configure: Fetch from SeatLayout and use available_seats
-      const seatLayout = await SeatLayout.findOne({
+      // Configure: Fetch from ShowSeatLayout (show-specific) and count available seats
+      console.log(' Looking for ShowSeatLayout:', {
+        event_id: eventId,
+        date: queryDate.toISOString(),
+        time,
+        language: language || '(empty)'
+      });
+      
+      const seatLayout = await ShowSeatLayout.findOne({
         event_id: eventId,
         date: queryDate,
         time,
-        language: language || { $exists: false } // Handle empty language as optional
+        language: language || ''
       });
       
       if (!seatLayout) {
-        return res.status(404).json({ success: false, message: 'Seat layout not found for this slot' });
+        console.error(' ShowSeatLayout not found');
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Seat layout not found for this slot. Please create the seat layout for this show first.' 
+        });
       }
       
-      remaining = seatLayout.available_seats; // Direct from response
+      console.log(` Found ShowSeatLayout with ${seatLayout.layout_data.length} seats`);
+      
+      // Release expired locks (>5 minutes)
+      await seatLayout.releaseExpired();
+      
+      // Reload to get updated data
+      const updatedLayout = await ShowSeatLayout.findById(seatLayout._id);
+      
+      // Count available seats
+      const availableSeats = updatedLayout.layout_data.filter(seat => seat.status === 'available').length;
+      remaining = availableSeats;
+      
+      console.log(` Configure capacity:`, {
+        totalSeats: updatedLayout.layout_data.length,
+        availableSeats,
+        bookedSeats: updatedLayout.layout_data.filter(s => s.status === 'booked').length,
+        lockedSeats: updatedLayout.layout_data.filter(s => s.status === 'locked').length
+      });
     } else {
       return res.status(400).json({ success: false, message: 'Unsupported event type' });
     }

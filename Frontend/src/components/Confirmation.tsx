@@ -408,7 +408,7 @@ export default function BookingConfirmation() {
             <img
               src="https://i.ibb.co/RTdCGXqg/image.png"
               alt="Watermark"
-              className="opacity-5"
+              className="opacity-10"
               style={{
                 width: '400px',
                 transform: 'rotate(-45deg)',
