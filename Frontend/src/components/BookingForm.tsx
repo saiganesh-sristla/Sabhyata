@@ -10,7 +10,6 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { format } from "date-fns";
 import BookingBtn from "./ui/BookingBtn";
-import { AuthDialog } from "@/components/ui/AuthDialog";
 
 // Custom Dropdown Component (for Language only)
 const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter = (v: string) => v, getTimeForLang }: {
@@ -31,10 +30,8 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
 
   const displayTime = getTimeForLang ? getTimeForLang(value) : '';
   const displayValue = value
-  ? `${displayFormatter(value)} ${displayTime ? `at ${formatTime12Hour(displayTime)}` : ''}`
-  : "Select";
-
-
+    ? `${displayFormatter(value)} ${displayTime ? `at ${formatTime12Hour(displayTime)}` : ''}`
+    : "Select";
 
   return (
     <div className="relative w-full">
@@ -52,10 +49,7 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
       
       {isOpen && !disabled && (
         <>
-          <div 
-            className="fixed inset-0 z-10" 
-            onClick={() => setIsOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute top-full left-0 right-0 mt-1 bg-white border-2 border-heritage-burgundy/20 rounded-lg shadow-lg z-20 overflow-hidden">
             {options.length === 0 ? (
               <div className="px-3 py-2 text-sm text-gray-500">No options available</div>
@@ -63,22 +57,20 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
               options.map((option) => {
                 const optionTime = getTimeForLang ? getTimeForLang(option) : '';
                 return (
-                <button
-                  key={option}
-                  type="button"
-                  onClick={() => {
-                    onChange(option);
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
-                >
-                  <span className="text-sm font-medium text-gray-800">
-                    {displayFormatter(option)} {optionTime ? `at ${formatTime12Hour(optionTime)}` : ''}
-                  </span>
-                  {value === option && (
-                    <Check className="w-4 h-4 text-heritage-burgundy" />
-                  )}
-                </button>
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => {
+                      onChange(option);
+                      setIsOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
+                  >
+                    <span className="text-sm font-medium text-gray-800">
+                      {displayFormatter(option)} {optionTime ? `at ${formatTime12Hour(optionTime)}` : ''}
+                    </span>
+                    {value === option && <Check className="w-4 h-4 text-heritage-burgundy" />}
+                  </button>
                 );
               })
             )}
@@ -111,17 +103,13 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
   const [isPopupOpen, setIsPopupOpen] = useState(false);
   const [scrollHintCount, setScrollHintCount] = useState(0);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [isTogglingInterest, setIsTogglingInterest] = useState(false);
   
   const { toast } = useToast();
   const navigate = useNavigate();
   const isClickProcessing = useRef(false);
 
-  const API_BASE_URL =
-    import.meta.env.VITE_API_BASE_URL ||
-    "https://sabhyata.onrender.com";
-  const token = localStorage.getItem("token");
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://sabhyata.onrender.com";
 
   const isInactive = eventData?.status === "inactive";
   const isConfigure = useMemo(() => eventData?.type === 'configure' || eventData?.configureSeats === true, [eventData]);
@@ -269,180 +257,83 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
     }));
   }, [selectedTime]);
 
-  // ✅ Fetch remaining capacity when date/time/language changes
-  // ✅ Fetch remaining capacity when date/time/language changes
-useEffect(() => {
-  const fetchRemainingCapacity = async () => {
-    if (!eventId || !formData.selectedDate || !selectedTime) return;
+  // Fetch remaining capacity
+  useEffect(() => {
+    const fetchRemainingCapacity = async () => {
+      if (!eventId || !formData.selectedDate || !selectedTime) return;
 
-    try {
-      // ✅ Determine event type
-      const isConfigure = eventData?.type === "configure" || eventData?.configureSeats === true;
-      const isWalking = eventData?.type === "walking" || eventData?.configureSeats === false;
+      try {
+        let remaining;
 
-      let remaining;
-
-      if (isWalking) {
-        // ✅ For walking: Use events/remaining-capacity endpoint (booking count vs capacity)
-        const response = await fetch(
-          `${API_BASE_URL}/events/${eventId}/remaining-capacity?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+        if (isWalking) {
+          const response = await fetch(
+            `${API_BASE_URL}/events/${eventId}/remaining-capacity?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`
+          );
+          const data = await response.json();
+          if (data.success) {
+            remaining = data.data.remaining;
           }
-        );
+        } else if (isConfigure) {
+          const seatResponse = await fetch(
+            `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || 'none'}`
+          );
+          const seatData = await seatResponse.json();
 
-        const data = await response.json();
-
-        if (data.success) {
-          remaining = data.data.remaining;
-        } else {
-          console.error('Failed to fetch remaining capacity for walking:', data.message);
-          return;
-        }
-      } else if (isConfigure) {
-        
-        // ✅ For configure: Call seat-layouts endpoint and use available_seats
-        const seatResponse = await fetch(
-          `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || 'none'}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+          // Trigger cleanup of expired temp bookings
+          try {
+            await fetch(`${API_BASE_URL}/temp-bookings/test-cleanup`, { method: 'POST' });
+          } catch (e) {
+            console.warn('Cleanup failed (non-critical):', e);
           }
-        );
 
-        
-        const seatData = await seatResponse.json();
-
-  const response = await fetch(
-          `${API_BASE_URL}/events/${eventId}/remaining-capacity?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+          if (seatData.success) {
+            remaining = seatData.data.seatLayout.available_seats;
           }
-        );
-
-        const data = await response.json();
-
-        // ✅ First, trigger manual cleanup to release any expired locks
-        try {
-          await fetch(`${API_BASE_URL}/temp-bookings/test-cleanup`, {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          console.log('🧹 Triggered manual cleanup of expired locks');
-        } catch (cleanupError) {
-          console.warn('Cleanup trigger failed (non-critical):', cleanupError);
         }
 
-
-        if (seatData.success) {
-          remaining = seatData.data.seatLayout.available_seats; // Direct from response
-        } else {
-          console.error('Failed to fetch seat layout:', seatData.message);
-          return;
-        }
-      } else {
-        console.error('Unsupported event type for capacity check');
-        return;
+        setRemainingCapacity(remaining);
+      } catch (error) {
+        console.error('Error fetching capacity:', error);
+        setRemainingCapacity(null);
       }
+    };
 
-      setRemainingCapacity(remaining);
-    } catch (error) {
-      console.error('Error fetching remaining capacity:', error);
-      setRemainingCapacity(null);
-    }
-  };
+    fetchRemainingCapacity();
+  }, [eventId, formData.selectedDate, selectedTime, formData.language, eventData?.type, eventData?.configureSeats, API_BASE_URL, isWalking, isConfigure]);
 
-  fetchRemainingCapacity();
-}, [eventId, formData.selectedDate, selectedTime, formData.language, eventData?.type, eventData?.configureSeats, token, API_BASE_URL]);
-
-  // ✅ Fetch event and interest status together
+  // Fetch event data
   useEffect(() => {
     const fetchEventAndInterest = async () => {
       if (!eventId) {
-        toast({
-          title: "Error",
-          description: "No event ID provided.",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "No event ID provided.", variant: "destructive" });
         return;
       }
 
       try {
         const response = await fetch(`${API_BASE_URL}/events/${eventId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
         });
         const data = await response.json();
 
         if (data.success) {
-          // Set initial event data
           const initialEventData = { ...data.data };
-          // Ensure defaults if not present
           initialEventData.userInterested = initialEventData.userInterested ?? false;
           initialEventData.isInterested = initialEventData.isInterested ?? 0;
           setEventData(initialEventData);
 
           if (data.data.status === "inactive") {
-            toast({
-              title: "Notice",
-              description: "This event is currently inactive.",
-              variant: "destructive",
-            });
-          }
-
-          // If token present, fetch latest interest status
-          if (token && initialEventData._id) {
-            try {
-              const interestRes = await fetch(`${API_BASE_URL}/events/${initialEventData._id}/interest`, {
-                method: 'PATCH',
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                },
-              });
-
-              if (interestRes.ok) {
-                const interestData = await interestRes.json();
-                if (interestData.success) {
-                  setEventData((prev: any) => ({
-                    ...prev,
-                    userInterested: interestData.data?.userInterested ?? prev.userInterested,
-                    isInterested: interestData.data?.isInterested ?? prev.isInterested,
-                  }));
-                }
-              } else {
-                console.warn('Failed to fetch interest status:', interestRes.status);
-              }
-            } catch (interestErr) {
-              console.error('Error fetching interest status:', interestErr);
-            }
+            toast({ title: "Notice", description: "This event is currently inactive.", variant: "destructive" });
           }
         } else {
-          toast({
-            title: "Error",
-            description: data.message || "Failed to fetch event details.",
-            variant: "destructive",
-          });
+          toast({ title: "Error", description: data.message || "Failed to fetch event.", variant: "destructive" });
         }
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch event details. Please try again.",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Failed to fetch event. Please try again.", variant: "destructive" });
       }
     };
 
     fetchEventAndInterest();
-  }, [eventId, toast, token, API_BASE_URL]);
+  }, [eventId, toast, API_BASE_URL]);
 
   useEffect(() => {
     let count = 0;
@@ -544,7 +435,6 @@ useEffect(() => {
     formData.adults * foreignerPrice +
     formData.children * foreignerPrice * childrenDiscount;
 
-  // ✅ Capacity validation
   const isCapacityExceeded = remainingCapacity !== null && totalTickets > remainingCapacity;
   const canIncrementTickets = remainingCapacity === null || totalTickets < remainingCapacity;
 
@@ -562,11 +452,10 @@ useEffect(() => {
   };
 
   const updateTickets = (type: "adults" | "children", increment: boolean) => {
-    // ✅ Prevent increment if at capacity
     if (increment && !canIncrementTickets) {
       toast({
         title: "Capacity Reached",
-        description: `Only ${remainingCapacity} ticket${remainingCapacity !== 1 ? 's' : ''} remaining for this slot.`,
+        description: `Only ${remainingCapacity} ticket${remainingCapacity !== 1 ? 's' : ''} remaining.`,
         variant: "destructive",
       });
       return;
@@ -579,11 +468,6 @@ useEffect(() => {
   };
 
   const handleToggleInterest = async () => {
-    if (!token) {
-      setAuthDialogOpen(true);
-      return;
-    }
-
     if (isTogglingInterest || !eventData?._id) return;
     setIsTogglingInterest(true);
 
@@ -593,31 +477,20 @@ useEffect(() => {
     };
 
     try {
-      setEventData((prev: any) => {
-        if (!prev) return prev;
-        const isCurrentlyInterested = prev.userInterested ?? false;
-        return {
-          ...prev,
-          userInterested: !isCurrentlyInterested,
-          isInterested: isCurrentlyInterested 
-            ? Math.max(0, (prev.isInterested || 0) - 1)
-            : (prev.isInterested || 0) + 1
-        };
-      });
+      setEventData((prev: any) => ({
+        ...prev,
+        userInterested: !prev.userInterested,
+        isInterested: prev.userInterested ? (prev.isInterested || 0) - 1 : (prev.isInterested || 0) + 1
+      }));
 
       const res = await fetch(`${API_BASE_URL}/events/${eventData._id}/interest`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       const data = await res.json();
 
-      if (!data.success) {
-        throw new Error(data.message || 'Failed to update interest');
-      }
+      if (!data.success) throw new Error(data.message || 'Failed to update interest');
 
       setEventData((prev: any) => ({
         ...prev,
@@ -628,121 +501,76 @@ useEffect(() => {
       toast({
         title: data.data?.userInterested ? 'Added to interests' : 'Removed from interests',
         description: data.data?.userInterested
-          ? 'Event has been added to your interests'
-          : 'Event has been removed from your interests'
+          ? 'Event added to your interests'
+          : 'Event removed from your interests'
       });
-
     } catch (err: any) {
-      setEventData((prev: any) => ({
-        ...prev,
-        ...originalState
-      }));
-
-      toast({
-        title: 'Error',
-        description: err?.message || 'Failed to update interest',
-        variant: 'destructive'
-      });
+      setEventData((prev: any) => ({ ...prev, ...originalState }));
+      toast({ title: 'Error', description: err?.message || 'Failed to update interest', variant: 'destructive' });
     } finally {
       setIsTogglingInterest(false);
     }
   };
 
-const handleBook = () => {
-  if (!token) {
-    setAuthDialogOpen(true);
-    return;
-  }
+  const handleBook = () => {
+    if (isInactive) {
+      toast({ title: "Error", description: "This event is inactive.", variant: "destructive" });
+      return;
+    }
 
-  if (isInactive) {
-    toast({
-      title: "Error",
-      description: "This event is inactive and cannot be booked.",
-      variant: "destructive",
+    if (totalTickets === 0) {
+      toast({ title: "Error", description: "Please select at least one ticket.", variant: "destructive" });
+      return;
+    }
+
+    if (remainingCapacity !== null && totalTickets > remainingCapacity) {
+      toast({
+        title: "Capacity Exceeded",
+        description: `Only ${remainingCapacity} ticket${remainingCapacity !== 1 ? 's' : ''} available.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.selectedDate || !formData.selectedTime) {
+      toast({ title: "Error", description: "Please select date and time.", variant: "destructive" });
+      return;
+    }
+
+    if (hasLanguageAvailable && !formData.language) {
+      toast({ title: "Error", description: "Please select a language.", variant: "destructive" });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const params = new URLSearchParams({
+      eventId,
+      adults: formData.adults.toString(),
+      children: formData.children.toString(),
+      language: formData.language || "none",
+      date: formData.selectedDate,
+      time: formData.selectedTime,
+      isForeigner: formData.isForeigner.toString(),
+      totalAmount: totalPrice.toString(),
     });
-    return;
-  }
 
-  if (totalTickets === 0) {
-    toast({
-      title: "Error",
-      description: "Please select at least one ticket.",
-      variant: "destructive",
-    });
-    return;
-  }
+    const isConfigure = (eventData?.type === "configure") || (eventData?.configureSeats === true);
+    const isWalking = (eventData?.type === "walking") || (eventData?.configureSeats === false);
 
-  // ✅ Capacity check
-  if (remainingCapacity !== null && totalTickets > remainingCapacity) {
-    toast({
-      title: "Capacity Exceeded",
-      description: `Only ${remainingCapacity} ticket${remainingCapacity !== 1 ? 's' : ''} available for this slot. Please reduce quantity.`,
-      variant: "destructive",
-    });
-    return;
-  }
+    const nextPath = isWalking
+      ? `/payment/walking?${params.toString()}`
+      : `/book/seats?${params.toString()}`;
 
-  if (!formData.selectedDate || !formData.selectedTime) {
-    toast({
-      title: "Error",
-      description: "Please select date and time.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  if (hasLanguageAvailable && !formData.language) {
-    toast({
-      title: "Error",
-      description: "Please select a language.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  setIsSubmitting(true);
-
-  const params = new URLSearchParams({
-    eventId,
-    adults: formData.adults.toString(),
-    children: formData.children.toString(),
-    language: formData.language || "none",
-    date: formData.selectedDate,
-    time: formData.selectedTime,
-    isForeigner: formData.isForeigner.toString(),
-    totalAmount: totalPrice.toString(),
-  });
-
-  // ✅ FIX: Check if event type is "walking" OR if configureSeats is false
-  const isConfigure = (eventData?.type === "configure") || (eventData?.configureSeats === true);
-  const isWalking = (eventData?.type === "walking") || (eventData?.configureSeats === false);
-
-  console.log('Event type:', eventData?.type);
-  console.log('Configure seats:', eventData?.configureSeats);
-  console.log('Is configure?', isConfigure);
-  console.log('Is walking?', isWalking);
-
-  // ✅ Different paths for configure vs walking
-  const nextPath = isWalking
-    ? `/payment/walking?${params.toString()}` // ✅ Go directly to payment for walking
-    : `/book/seats?${params.toString()}`; // ✅ Go to seat selection for configure
-
-  console.log('Navigating to:', nextPath);
-  
-  navigate(nextPath);
-  setIsSubmitting(false);
-};
-
+    navigate(nextPath);
+    setIsSubmitting(false);
+  };
 
   const handleDateChange = (date: string) => {
     const schedule = getScheduleForDate(date);
     
     if (!schedule || !schedule.timeSlots || schedule.timeSlots.length === 0) {
-      toast({
-        title: "Error",
-        description: "No events available on this date.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "No events available on this date.", variant: "destructive" });
       return;
     }
     
@@ -757,19 +585,14 @@ const handleBook = () => {
   };
 
   const handleLanguageChange = (lang: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      language: lang,
-    }));
+    setFormData((prev) => ({ ...prev, language: lang }));
   };
 
   const handleOpenPopup = () => {
     if (isClickProcessing.current) return;
     isClickProcessing.current = true;
     setIsPopupOpen(true);
-    setTimeout(() => {
-      isClickProcessing.current = false;
-    }, 300);
+    setTimeout(() => { isClickProcessing.current = false; }, 300);
   };
 
   const handleClosePopup = () => {
@@ -796,11 +619,7 @@ const handleBook = () => {
           language: "",
         }));
         if (isPopupOpen) {
-          toast({
-            title: "No upcoming dates",
-            description: "No event dates available in the next 7 days.",
-            variant: "destructive",
-          });
+          toast({ title: "No upcoming dates", description: "No event dates available.", variant: "destructive" });
         }
       }
     }
@@ -815,21 +634,23 @@ const handleBook = () => {
 
   const MobileContent = () => (
     <div className="md:hidden px-2 py-1">
-      {!isPopupOpen && (<div className="flex justify-between items-center w-full mb-2">
-        <div className="flex items-center">
-          <IndianRupee className="w-4 h-4 text-heritage-burgundy mr-1" />
-          <span className="text-lg font-bold text-heritage-burgundy">{Math.round(formData.isForeigner ? foreignerPrice : basePrice)}</span>
-          <span className="text-xs text-muted-foreground ml-1">onwards</span>
+      {!isPopupOpen && (
+        <div className="flex justify-between items-center w-full mb-2">
+          <div className="flex items-center">
+            <IndianRupee className="w-4 h-4 text-heritage-burgundy mr-1" />
+            <span className="text-lg font-bold text-heritage-burgundy">{Math.round(formData.isForeigner ? foreignerPrice : basePrice)}</span>
+            <span className="text-xs text-muted-foreground ml-1">onwards</span>
+          </div>
+          <Button
+            variant="outline"
+            className="border-heritage-burgundy/50 text-heritage-burgundy hover:bg-heritage-burgundy/10 hover:text-heritage-burgundy min-h-[32px] px-3 text-xs"
+            onClick={handleOpenPopup}
+            disabled={isInactive}
+          >
+            See Details
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          className="border-heritage-burgundy/50 text-heritage-burgundy hover:bg-heritage-burgundy/10 hover:text-heritage-burgundy min-h-[32px] px-3 text-xs"
-          onClick={handleOpenPopup}
-          disabled={isInactive}
-        >
-          See Details
-        </Button>
-      </div>)}
+      )}
 
       {isPopupOpen && (
         <div className="relative inset-0 z-50 bg-[#FBF1E4] overflow-y-auto rounded-lg h-screen">
@@ -842,7 +663,7 @@ const handleBook = () => {
                 onClick={handleClosePopup}
                 className="text-heritage-burgundy hover:bg-heritage-burgundy/10 px-2"
               >
-                ✕
+                X
               </Button>
             </div>
             <div className="flex-1 px-2 space-y-2">
@@ -877,7 +698,7 @@ const handleBook = () => {
                   <Dialog open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                     <DialogTrigger asChild>
                       <Button variant="link" className="text-heritage-burgundy text-xs px-0" disabled={isInactive || availableDates.length === 0}>
-                        More dates →
+                        More dates
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[425px]">
@@ -895,20 +716,12 @@ const handleBook = () => {
                                 handleDateChange(dateStr);
                                 setIsCalendarOpen(false);
                               } else {
-                                toast({
-                                  title: "Error",
-                                  description: "Selected date is not available.",
-                                  variant: "destructive",
-                                });
+                                toast({ title: "Error", description: "Selected date not available.", variant: "destructive" });
                               }
                             }
                           }}
-                          modifiers={{
-                            event: availableDates.map((d) => new Date(d)),
-                          }}
-                          modifiersClassNames={{
-                            event: "bg-heritage-burgundy/20 text-heritage-burgundy rounded-full",
-                          }}
+                          modifiers={{ event: availableDates.map((d) => new Date(d)) }}
+                          modifiersClassNames={{ event: "bg-heritage-burgundy/20 text-heritage-burgundy rounded-full" }}
                           disabled={isInactive}
                           className="mx-auto"
                         />
@@ -953,7 +766,7 @@ const handleBook = () => {
                     <p className="text-xs font-semibold">{eventData?.venue || "N/A"}</p>
                   </div>
                 </div>
-                <div className="flexitems-center space-x-1">
+                <div className="flex items-center space-x-1">
                   <Clock className="w-3 h-3 text-heritage-burgundy" />
                   <div>
                     <p className="text-xs text-muted-foreground">Duration</p>
@@ -973,23 +786,11 @@ const handleBook = () => {
                 <div className="flex items-center justify-between py-1 px-2 border border-heritage-burgundy/20 rounded-lg bg-white/50">
                   <div className="text-xs font-medium">Adult</div>
                   <div className="flex items-center space-x-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateTickets("adults", false)}
-                      disabled={formData.adults <= 0 || isInactive}
-                      className="h-6 w-6 p-0 border-heritage-burgundy/30"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => updateTickets("adults", false)} disabled={formData.adults <= 0 || isInactive} className="h-6 w-6 p-0 border-heritage-burgundy/30">
                       <Minus className="w-3 h-3" />
                     </Button>
                     <span className="font-semibold text-sm w-[18px] text-center">{formData.adults}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateTickets("adults", true)}
-                      disabled={isInactive || !canIncrementTickets}
-                      className="h-6 w-6 p-0 border-heritage-burgundy/30"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => updateTickets("adults", true)} disabled={isInactive || !canIncrementTickets} className="h-6 w-6 p-0 border-heritage-burgundy/30">
                       <Plus className="w-3 h-3" />
                     </Button>
                   </div>
@@ -1002,30 +803,17 @@ const handleBook = () => {
                     )}
                   </div>
                   <div className="flex items-center space-x-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateTickets("children", false)}
-                      disabled={formData.children <= 0 || isInactive}
-                      className="h-6 w-6 p-0 border-heritage-burgundy/30"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => updateTickets("children", false)} disabled={formData.children <= 0 || isInactive} className="h-6 w-6 p-0 border-heritage-burgundy/30">
                       <Minus className="w-3 h-3" />
                     </Button>
                     <span className="font-semibold text-sm w-[18px] text-center">{formData.children}</span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => updateTickets("children", true)}
-                      disabled={isInactive || !canIncrementTickets}
-                      className="h-6 w-6 p-0 border-heritage-burgundy/30"
-                    >
+                    <Button variant="outline" size="sm" onClick={() => updateTickets("children", true)} disabled={isInactive || !canIncrementTickets} className="h-6 w-6 p-0 border-heritage-burgundy/30">
                       <Plus className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
               </div>
 
-              {/* ✅ Capacity indicator */}
               {remainingCapacity !== null && (
                 <div className="text-xs text-center text-muted-foreground">
                   {totalTickets > 0 && isCapacityExceeded && (
@@ -1041,9 +829,7 @@ const handleBook = () => {
                 <Checkbox
                   id="foreigner-mobile-popup"
                   checked={formData.isForeigner}
-                  onCheckedChange={checked =>
-                    setFormData(prev => ({ ...prev, isForeigner: checked as boolean }))
-                  }
+                  onCheckedChange={checked => setFormData(prev => ({ ...prev, isForeigner: checked as boolean }))}
                   disabled={isInactive}
                   className="border-heritage-burgundy/50 data-[state=checked]:bg-heritage-burgundy data-[state=checked]:border-heritage-burgundy h-4 w-4"
                 />
@@ -1052,13 +838,8 @@ const handleBook = () => {
                 </Label>
               </div>
 
-              {isInactive && (
-                <p className="text-xs text-red-600 text-center">Event is inactive</p>
-              )}
-              
-              {availableDates.length === 0 && (
-                <p className="text-xs text-red-600 text-center">No dates available for booking</p>
-              )}
+              {isInactive && <p className="text-xs text-red-600 text-center">Event is inactive</p>}
+              {availableDates.length === 0 && <p className="text-xs text-red-600 text-center">No dates available for booking</p>}
 
               <Button
                 onClick={handleBook}
@@ -1091,12 +872,8 @@ const handleBook = () => {
               <p className="text-sm font-medium text-muted-foreground">Select Date</p>
               <Dialog open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                 <DialogTrigger asChild>
-                  <Button 
-                    variant="link" 
-                    className="text-heritage-burgundy text-sm p-0 h-auto font-normal" 
-                    disabled={isInactive || availableDates.length === 0}
-                  >
-                    See all dates →
+                  <Button variant="link" className="text-heritage-burgundy text-sm p-0 h-auto font-normal" disabled={isInactive || availableDates.length === 0}>
+                    See all dates
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[425px]">
@@ -1114,20 +891,12 @@ const handleBook = () => {
                             handleDateChange(dateStr);
                             setIsCalendarOpen(false);
                           } else {
-                            toast({
-                              title: "Error",
-                              description: "Selected date is not available.",
-                              variant: "destructive",
-                            });
+                            toast({ title: "Error", description: "Selected date not available.", variant: "destructive" });
                           }
                         }
                       }}
-                      modifiers={{
-                        event: availableDates.map((d) => new Date(d)),
-                      }}
-                      modifiersClassNames={{
-                        event: "bg-heritage-burgundy/20 text-heritage-burgundy rounded-full",
-                      }}
+                      modifiers={{ event: availableDates.map((d) => new Date(d)) }}
+                      modifiersClassNames={{ event: "bg-heritage-burgundy/20 text-heritage-burgundy rounded-full" }}
                       disabled={isInactive}
                       className="mx-auto"
                     />
@@ -1135,7 +904,6 @@ const handleBook = () => {
                 </DialogContent>
               </Dialog>
             </div>
-            
             <div className="grid grid-cols-3 gap-2 mb-2">
               {availableDates.length > 0 ? (
                 availableDates.slice(0, 6).map((date: string) => (
@@ -1214,23 +982,11 @@ const handleBook = () => {
             <p className="font-medium text-foreground">Adult</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => updateTickets("adults", false)}
-              disabled={formData.adults <= 0 || isInactive}
-              className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10"
-            >
+            <Button variant="outline" size="sm" onClick={() => updateTickets("adults", false)} disabled={formData.adults <= 0 || isInactive} className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10">
               <Minus className="w-4 h-4 text-heritage-burgundy" />
             </Button>
             <span className="font-semibold text-lg min-w-[24px] text-center">{formData.adults}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => updateTickets("adults", true)}
-              disabled={isInactive || !canIncrementTickets}
-              className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10"
-            >
+            <Button variant="outline" size="sm" onClick={() => updateTickets("adults", true)} disabled={isInactive || !canIncrementTickets} className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10">
               <Plus className="w-4 h-4 text-heritage-burgundy" />
             </Button>
           </div>
@@ -1244,30 +1000,17 @@ const handleBook = () => {
             )}
           </div>
           <div className="flex items-center space-x-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => updateTickets("children", false)}
-              disabled={formData.children <= 0 || isInactive}
-              className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10"
-            >
+            <Button variant="outline" size="sm" onClick={() => updateTickets("children", false)} disabled={formData.children <= 0 || isInactive} className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10">
               <Minus className="w-4 h-4 text-heritage-burgundy" />
             </Button>
             <span className="font-semibold text-lg min-w-[24px] text-center">{formData.children}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => updateTickets("children", true)}
-              disabled={isInactive || !canIncrementTickets}
-              className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10"
-            >
+            <Button variant="outline" size="sm" onClick={() => updateTickets("children", true)} disabled={isInactive || !canIncrementTickets} className="h-8 w-8 p-0 border-heritage-burgundy/30 hover:bg-heritage-burgundy/10">
               <Plus className="w-4 h-4 text-heritage-burgundy" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* ✅ Capacity indicator */}
       {remainingCapacity !== null && (
         <div className="text-sm text-center text-muted-foreground mb-4">
           {totalTickets > 0 && isCapacityExceeded && (
@@ -1305,31 +1048,18 @@ const handleBook = () => {
         </div>
       </div>
 
-      {isInactive && (
-        <p className="text-sm text-red-600 text-center mt-2">Event is inactive</p>
-      )}
-      
-      {availableDates.length === 0 && (
-        <p className="text-sm text-red-600 text-center mt-2">No dates available for booking</p>
-      )}
+      {isInactive && <p className="text-sm text-red-600 text-center mt-2">Event is inactive</p>}
+      {availableDates.length === 0 && <p className="text-sm text-red-600 text-center mt-2">No dates available for booking</p>}
 
       <div className="flex items-center justify-center space-x-2 pt-3">
         <button
           type="button"
           onClick={handleToggleInterest}
           disabled={isTogglingInterest}
-          className={`flex items-center space-x-2 transition-all ${
-            isTogglingInterest ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
-          }`}
+          className={`flex items-center space-x-2 transition-all ${isTogglingInterest ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
           aria-label="Toggle interest"
         >
-          <Heart 
-            className={`w-4 h-4 ${
-              eventData?.userInterested 
-                ? 'fill-heritage-burgundy text-heritage-burgundy' 
-                : 'text-heritage-burgundy'
-            }`} 
-          />
+          <Heart className={`w-4 h-4 ${eventData?.userInterested ? 'fill-heritage-burgundy text-heritage-burgundy' : 'text-heritage-burgundy'}`} />
           <span className="text-sm text-muted-foreground">
             {eventData?.isInterested ?? 0} people interested
           </span>
@@ -1339,20 +1069,11 @@ const handleBook = () => {
   );
 
   return (
-    <>
-      <AuthDialog
-        open={authDialogOpen}
-        onOpenChange={setAuthDialogOpen}
-        title="Login Required"
-        description="Please login or register to book this event."
-      />
-
-      <Card className={`w-full max-w-md mx-auto ${isSpecial ? 'bg-[#FBF1E4]/95 backdrop-blur' : 'bg-background'} shadow-lg`}>
-        <CardContent className="px-4 md:px-6 pt-4 pb-0 md:py-6 space-y-4 md:space-y-2">
-          <MobileContent />
-          <DesktopContent />
-        </CardContent>
-      </Card>
-    </>
+    <Card className={`w-full max-w-md mx-auto ${isSpecial ? 'bg-[#FBF1E4]/95 backdrop-blur' : 'bg-background'} shadow-lg`}>
+      <CardContent className="px-4 md:px-6 pt-4 pb-0 md:py-6 space-y-4 md:space-y-2">
+        <MobileContent />
+        <DesktopContent />
+      </CardContent>
+    </Card>
   );
 };

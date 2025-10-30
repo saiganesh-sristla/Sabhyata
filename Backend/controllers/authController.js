@@ -206,9 +206,9 @@ exports.sendOtp = async (req, res) => {
 // Verify OTP
 exports.verifyOtp = async (req, res) => {
   try {
-    const { phone, otp } = req.body;
-    const stored = otps.get(phone);
+    const { phone, otp, name, email } = req.body;
 
+    const stored = otps.get(phone);
     if (!stored || Date.now() > stored.expires) {
       return res.status(400).json({ success: false, message: 'OTP expired or invalid' });
     }
@@ -221,11 +221,25 @@ exports.verifyOtp = async (req, res) => {
     if (!user) {
       const randomPassword = crypto.randomBytes(16).toString('hex');
       user = await User.create({
-        name: `${phone}`,
+        name: name || `${phone}`,
+        email: email || null,
         phone,
         password: await bcrypt.hash(randomPassword, 12),
         role: 'user'
       });
+    } else {
+      // UPDATE name/email only if provided and different
+      if (name && name.trim() && user.name !== name.trim()) {
+        user.name = name.trim();
+      }
+      if (email && email.trim() && user.email !== email.trim()) {
+        // Optional: check if email already exists
+        // const existingEmail = await User.findOne({ email: email.trim() });
+        // if (existingEmail && existingEmail._id.toString() !== user._id.toString()) {
+        //   return res.status(400).json({ success: false, message: 'Email already in use' });
+        // }
+        user.email = email.trim();
+      }
     }
 
     if (!user.isActive || user.isBlocked) {
