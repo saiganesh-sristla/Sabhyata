@@ -56,10 +56,13 @@ exports.createAbandonedCart = async (req, res) => {
     const cart = await AbandonedCart.findOneAndUpdate(
       { sessionId },
       {
+        sessionId,
         event,
         tickets,
         totalAmount,
         contactInfo,
+        status: 'active',
+        updatedAt: new Date(),
         // user: req.user ? req.user._id : undefined // if auth
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -71,6 +74,36 @@ exports.createAbandonedCart = async (req, res) => {
   } catch (error) {
      console.error("AbandonedCart save error", error);
     res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+// Mark abandoned cart as recovered
+exports.recoverAbandonedCart = async (req, res) => {
+  try {
+    const { sessionId, cartId, recoveredBookingId } = req.body;
+
+    if (!sessionId && !cartId) {
+      return res.status(400).json({ success: false, message: 'sessionId or cartId required' });
+    }
+
+    const filter = cartId ? { _id: cartId } : { sessionId };
+    const update = {
+      status: 'recovered',
+      recoveredAt: new Date(),
+      ...(recoveredBookingId ? { recoveredBookingId } : {})
+    };
+
+    const cart = await AbandonedCart.findOneAndUpdate(filter, update, { new: true });
+
+    if (!cart) {
+      return res.status(404).json({ success: false, message: 'Abandoned cart not found' });
+    }
+
+    console.log('✅ Abandoned cart recovered:', { id: cart._id, sessionId: cart.sessionId, recoveredBookingId });
+    res.json({ success: true, data: cart });
+  } catch (error) {
+    console.error('Recover abandoned cart error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 

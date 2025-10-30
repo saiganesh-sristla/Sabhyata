@@ -362,8 +362,9 @@ useEffect(() => {
   fetchRemainingCapacity();
 }, [eventId, formData.selectedDate, selectedTime, formData.language, eventData?.type, eventData?.configureSeats, token, API_BASE_URL]);
 
+  // ✅ Fetch event and interest status together
   useEffect(() => {
-    const fetchEvent = async () => {
+    const fetchEventAndInterest = async () => {
       if (!eventId) {
         toast({
           title: "Error",
@@ -383,13 +384,46 @@ useEffect(() => {
         const data = await response.json();
 
         if (data.success) {
-          setEventData(data.data);
+          // Set initial event data
+          const initialEventData = { ...data.data };
+          // Ensure defaults if not present
+          initialEventData.userInterested = initialEventData.userInterested ?? false;
+          initialEventData.isInterested = initialEventData.isInterested ?? 0;
+          setEventData(initialEventData);
+
           if (data.data.status === "inactive") {
             toast({
               title: "Notice",
               description: "This event is currently inactive.",
               variant: "destructive",
             });
+          }
+
+          // If token present, fetch latest interest status
+          if (token && initialEventData._id) {
+            try {
+              const interestRes = await fetch(`${API_BASE_URL}/events/${initialEventData._id}/interest`, {
+                method: 'PATCH',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (interestRes.ok) {
+                const interestData = await interestRes.json();
+                if (interestData.success) {
+                  setEventData((prev: any) => ({
+                    ...prev,
+                    userInterested: interestData.data?.userInterested ?? prev.userInterested,
+                    isInterested: interestData.data?.isInterested ?? prev.isInterested,
+                  }));
+                }
+              } else {
+                console.warn('Failed to fetch interest status:', interestRes.status);
+              }
+            } catch (interestErr) {
+              console.error('Error fetching interest status:', interestErr);
+            }
           }
         } else {
           toast({
@@ -407,8 +441,8 @@ useEffect(() => {
       }
     };
 
-    fetchEvent();
-  }, [eventId, toast]);
+    fetchEventAndInterest();
+  }, [eventId, toast, token, API_BASE_URL]);
 
   useEffect(() => {
     let count = 0;
@@ -561,7 +595,7 @@ useEffect(() => {
     try {
       setEventData((prev: any) => {
         if (!prev) return prev;
-        const isCurrentlyInterested = prev.userInterested;
+        const isCurrentlyInterested = prev.userInterested ?? false;
         return {
           ...prev,
           userInterested: !isCurrentlyInterested,

@@ -530,6 +530,7 @@ useEffect(() => {
               time: bookingData.time,
               language: bookingData.language,
               isForeigner: bookingData.isForeigner,
+              sessionId: sessionId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
@@ -537,6 +538,7 @@ useEffect(() => {
               specialNotes: specialNotes
             } : {
               tempBookingId: bookingId, // ✅ Use tempBookingId for seated events (pending bookings)
+              sessionId: sessionId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature,
@@ -563,6 +565,21 @@ useEffect(() => {
 
 
               localStorage.removeItem('currentSessionId');
+
+              // ✅ Mark abandoned cart as recovered
+              try {
+                const recoveredBookingId = verifyData?.data?.bookingId;
+                const recoverPayload: any = { sessionId };
+                if (recoveredBookingId) recoverPayload.recoveredBookingId = recoveredBookingId;
+                await fetch(`${API_BASE_URL}/abandoned-carts/recover`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(recoverPayload)
+                });
+                console.log('Recovered abandoned cart for session:', sessionId);
+              } catch (e:any) {
+                console.warn('Failed to mark cart recovered:', e?.message || e);
+              }
 
 
               const redirectReference = verifyData.data?.bookingReference || bookingData.bookingReference;
@@ -768,7 +785,7 @@ useEffect(() => {
         <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6">
           {/* ✅ Show timer only for seated events */}
           {!isWalkingTour && (
-            <div className="mb-6">
+            <div className="mb-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-gray-600">Time to complete payment</span>
                 <span className="text-sm font-medium">{formatTimer(timer)} / 10:00</span>
@@ -780,7 +797,7 @@ useEffect(() => {
           )}
 
 
-          <div className="mb-8">
+          <div className="mb-2">
             <h3 className="text-lg font-semibold mb-4">Contact Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
@@ -860,7 +877,7 @@ useEffect(() => {
           </div>
 
 
-          <div className="mb-6">
+          <div className="mb-4">
             <h3 className="text-lg font-semibold mb-4">Payment Method</h3>
             <div className="flex items-center justify-between p-4 border-2 border-blue-500 bg-blue-50 rounded-lg">
               <div className="flex items-center">
@@ -887,12 +904,6 @@ useEffect(() => {
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">All payment methods supported via Razorpay</p>
-          </div>
-
-
-          <div className="flex items-center gap-2 mb-6 text-sm text-green-600">
-            <Shield className="w-4 h-4" />
-            <span>Your payment information is secured with 256-bit SSL encryption</span>
           </div>
 
           {/* ✅ T&C Checkbox */}
