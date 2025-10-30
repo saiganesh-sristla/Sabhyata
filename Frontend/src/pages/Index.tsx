@@ -12,40 +12,25 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://sabhyata.onrender.com";
 
-// Skeleton Component
+// Skeleton Component (unchanged)
 const MonumentSkeleton = () => (
   <div className="bg-white shadow-lg rounded-2xl overflow-hidden relative animate-pulse">
-    {/* Image Skeleton */}
     <div className="w-full h-48 bg-gray-300"></div>
-
-    {/* Content Skeleton */}
     <div className="p-4 space-y-3">
-      {/* Title */}
       <div className="h-6 bg-gray-300 rounded w-3/4"></div>
-      
-      {/* Era and Style */}
       <div className="space-y-2">
         <div className="h-4 bg-gray-200 rounded w-1/2"></div>
         <div className="h-4 bg-gray-200 rounded w-2/3"></div>
       </div>
-      
-      {/* Description */}
       <div className="space-y-2 mt-2">
         <div className="h-3 bg-gray-200 rounded w-full"></div>
         <div className="h-3 bg-gray-200 rounded w-5/6"></div>
       </div>
-
-      {/* Tags */}
       <div className="flex flex-wrap gap-2 mt-2">
         <div className="h-5 bg-gray-200 rounded w-20"></div>
         <div className="h-5 bg-gray-200 rounded w-24"></div>
         <div className="h-5 bg-gray-200 rounded w-16"></div>
       </div>
-
-      {/* Upcoming Events */}
-      <div className="h-4 bg-gray-200 rounded w-1/3 mt-2"></div>
-
-      {/* Button */}
       <div className="h-10 bg-gray-300 rounded-md mt-4"></div>
     </div>
   </div>
@@ -67,7 +52,7 @@ function MonumentList() {
 
   const fetchMonuments = async () => {
     setLoading(true);
-    let url = `${API_BASE_URL}/monuments?page=${page}&limit=20`;
+    let url = `${API_BASE_URL}/monuments?page=${page}&limit=20&status=active`;
     if (period !== "all")
       url += `&establishmentEra=${encodeURIComponent(period)}`;
     if (experience !== "all")
@@ -81,19 +66,39 @@ function MonumentList() {
       });
       const data = await res.json();
       if (data.success) {
-        setMonuments(data.data.monuments);
+        // Fetch events for each monument
+        const monumentsWithEvents = await Promise.all(
+          data.data.monuments.map(async (m) => {
+            try {
+              const evRes = await fetch(`${API_BASE_URL}/monuments/${m._id}/events`, {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+              const evData = await evRes.json();
+              if (evData.success) {
+                // Only include published events
+                m.publishedEvents = (evData.data || []).filter((e) => e.status === "published");
+              } else {
+                m.publishedEvents = [];
+              }
+            } catch {
+              m.publishedEvents = [];
+            }
+            return m;
+          })
+        );
+        setMonuments(monumentsWithEvents);
         setTotalPages(data.data.pagination.totalPages);
 
         // Extract unique periods and experiences
         const uniquePeriods = [
           ...new Set(
-            data.data.monuments.map((m) => m.establishmentEra).filter(Boolean)
+            monumentsWithEvents.map((m) => m.establishmentEra).filter(Boolean)
           ),
         ];
         const uniqueExperiences = [
-          ...new Set(
-            data.data.monuments.map((m) => m.category).filter(Boolean)
-          ),
+          ...new Set(monumentsWithEvents.map((m) => m.category).filter(Boolean)),
         ];
         setPeriods(["all", ...uniquePeriods]);
         setExperiences(["all", ...uniqueExperiences]);
@@ -124,7 +129,6 @@ function MonumentList() {
         </p>
       </div>
 
-      {/* Loading State */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[...Array(3)].map((_, index) => (
@@ -133,7 +137,6 @@ function MonumentList() {
         </div>
       ) : (
         <>
-          {/* Monument Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {monuments.map((m) => (
               <div
@@ -156,10 +159,7 @@ function MonumentList() {
                   <h2 className="text-xl font-bold uppercase text-[#36454F]">
                     {m.name}
                   </h2>
-                  <p className="text-sm text-gray-500">
-                    Era: {m.establishmentEra || "N/A"}
-                  </p>
-                  <p className="text-sm text-gray-500">Style: {m.style || "N/A"}</p>
+
                   <p className="mt-2 text-sm italic text-gray-900">
                     "{m.description.slice(0, 100)}..."
                   </p>
@@ -176,12 +176,23 @@ function MonumentList() {
                     ))}
                   </div>
 
-                  {/* Upcoming Events */}
-               <div className="mt-2 flex items-center text-sm text-orange-600">
-  <FaCalendarAlt className="mr-1" />
-  Upcoming Event{m.events?.length === 0 ? "" : "s"}: {m.events?.length || 0}
-</div>
-
+                  {/* Upcoming Events - use event names */}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-orange-600">
+                    {m.publishedEvents?.length > 0 ? (
+                      m.publishedEvents.map((ev) => (
+                        <span key={ev._id}
+                          className={`px-2 py-1 rounded
+                          font-bold mr-2 relative flex items-center 
+                          ${ev.isSpecial
+                            ? "bg-yellow-200 text-[#8B1538] border border-yellow-400"
+                            : "bg-orange-50 text-[#8B1538]"}`}>
+                          {ev.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-500">No published events</span>
+                    )}
+                  </div>
 
                   {/* Explore Button */}
                   <Link
@@ -195,7 +206,6 @@ function MonumentList() {
             ))}
           </div>
 
-          {/* Empty State */}
           {monuments.length === 0 && !loading && (
             <div className="text-center py-12">
               <p className="text-gray-500 text-lg">No monuments found</p>

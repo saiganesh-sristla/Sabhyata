@@ -4,6 +4,7 @@ const {
   getAllAbandonedCarts,
   getAbandonedCartById,
   createAbandonedCart,
+  recoverAbandonedCart,
   sendReminder,
   deleteAbandonedCart,
   exportAbandonedCartsCSV,
@@ -16,6 +17,7 @@ router.get('/export', exportAbandonedCartsCSV);
 router.get('/analytics', getAbandonedCartAnalytics);
 router.get('/:id', getAbandonedCartById);
 router.post('/', createAbandonedCart);
+router.post('/recover', recoverAbandonedCart);
 router.post('/:id/reminder', sendReminder);
 router.delete('/:id', deleteAbandonedCart);
 

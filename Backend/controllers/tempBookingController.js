@@ -128,7 +128,7 @@ exports.createTempBooking = async (req, res) => {
     }
 
     // ===== CREATE TEMP BOOKING (NO TICKETS YET) =====
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     // Clean seat data - remove lockedAt/lockedBy fields from request
     const cleanedSeats = (seats || []).map(seat => ({
@@ -172,7 +172,7 @@ exports.createTempBooking = async (req, res) => {
     // Schedule auto-release
     setTimeout(async () => {
       await releaseExpiredBooking(booking._id);
-    }, 5 * 60 * 1000);
+    }, 10 * 60 * 1000);
 
     res.json({
       success: true,
@@ -181,7 +181,7 @@ exports.createTempBooking = async (req, res) => {
         bookingId: booking._id,
         bookingReference: booking.bookingReference,
         expiresAt: booking.expiresAt,
-        expiresIn: 300
+        expiresIn: 600
       }
     });
 
@@ -478,7 +478,7 @@ res.json({
     bookingId: booking._id, // ✅ Use bookingId
     bookingReference: booking.bookingReference, // TEMP-XXX
     expiresAt: booking.expiresAt,
-    expiresIn: 300
+    expiresIn: 600
   }
 });
 

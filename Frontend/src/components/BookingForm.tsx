@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Minus, Plus, IndianRupee, Clock, MapPin, Languages, ChevronDown, Heart, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,16 +13,28 @@ import BookingBtn from "./ui/BookingBtn";
 import { AuthDialog } from "@/components/ui/AuthDialog";
 
 // Custom Dropdown Component (for Language only)
-const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter = (v: string) => v }: {
+const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter = (v: string) => v, getTimeForLang }: {
   value: string;
   onChange: (value: string) => void;
   options: string[];
   disabled: boolean;
   displayFormatter?: (value: string) => string;
+  getTimeForLang?: (lang: string) => string;
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  const displayValue = value ? displayFormatter(value) : "Select";
+  const formatTime12Hour = (time) => {
+    if (!time) return '';
+    const date = new Date(`1970-01-01T${time}:00`);
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  const displayTime = getTimeForLang ? getTimeForLang(value) : '';
+  const displayValue = value
+  ? `${displayFormatter(value)} ${displayTime ? `at ${formatTime12Hour(displayTime)}` : ''}`
+  : "Select";
+
+
 
   return (
     <div className="relative w-full">
@@ -48,7 +60,9 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
             {options.length === 0 ? (
               <div className="px-3 py-2 text-sm text-gray-500">No options available</div>
             ) : (
-              options.map((option) => (
+              options.map((option) => {
+                const optionTime = getTimeForLang ? getTimeForLang(option) : '';
+                return (
                 <button
                   key={option}
                   type="button"
@@ -59,13 +73,14 @@ const CustomDropdown = ({ value, onChange, options, disabled, displayFormatter =
                   className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-heritage-burgundy/10 focus:outline-none focus:bg-heritage-burgundy/10"
                 >
                   <span className="text-sm font-medium text-gray-800">
-                    {displayFormatter(option)}
+                    {displayFormatter(option)} {optionTime ? `at ${formatTime12Hour(optionTime)}` : ''}
                   </span>
                   {value === option && (
                     <Check className="w-4 h-4 text-heritage-burgundy" />
                   )}
                 </button>
-              ))
+                );
+              })
             )}
           </div>
         </>
@@ -109,6 +124,9 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
   const token = localStorage.getItem("token");
 
   const isInactive = eventData?.status === "inactive";
+  const isConfigure = useMemo(() => eventData?.type === 'configure' || eventData?.configureSeats === true, [eventData]);
+  const isWalking = useMemo(() => eventData?.type === 'walking', [eventData]);
+  const showSeparateTime = !isConfigure || isWalking;
 
   const getScheduleForDate = useMemo(() => {
     return (dateStr: string) => {
@@ -122,7 +140,7 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
   }, [eventData]);
 
   const hasLanguageAvailable = useMemo(() => {
-    if (!formData.selectedDate) return false;
+    if (!formData.selectedDate || isWalking) return false;
     const schedule = getScheduleForDate(formData.selectedDate);
     if (!schedule || !schedule.timeSlots) return false;
     
@@ -144,7 +162,7 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
       }
       return true;
     });
-  }, [formData.selectedDate, eventData, getScheduleForDate]);
+  }, [formData.selectedDate, eventData, getScheduleForDate, isWalking]);
 
   const availableLanguages = useMemo(() => {
     if (!hasLanguageAvailable) return [];
@@ -173,6 +191,32 @@ export const BookingForm = ({ eventId, isSpecial = false, eventPrice, eventTitle
     
     return [...new Set(validTimeSlots.map((slot: any) => slot.lang))];
   }, [formData.selectedDate, eventData, getScheduleForDate, hasLanguageAvailable]);
+
+  const getTimeForLang = useCallback((lang: string) => {
+    const schedule = getScheduleForDate(formData.selectedDate);
+    if (!schedule) return '';
+    
+    const now = new Date();
+    const isToday = formData.selectedDate === now.toISOString().split('T')[0];
+    
+    const validTimeSlot = schedule.timeSlots?.find((slot: any) => {
+      if (!slot.isLangAvailable || slot.lang !== lang) return false;
+      
+      if (isToday) {
+        const [hours, minutes] = slot.time.split(':').map(Number);
+        const slotTime = new Date(now);
+        slotTime.setHours(hours, minutes, 0, 0);
+        
+        const oneHourFromNow = new Date(now);
+        oneHourFromNow.setHours(now.getHours() + 1);
+        
+        return slotTime >= oneHourFromNow;
+      }
+      return true;
+    });
+    
+    return validTimeSlot?.time || '';
+  }, [formData.selectedDate, getScheduleForDate]);
 
   const selectedTime = useMemo(() => {
     const schedule = getScheduleForDate(formData.selectedDate);
@@ -258,6 +302,31 @@ useEffect(() => {
           return;
         }
       } else if (isConfigure) {
+        
+        // ✅ For configure: Call seat-layouts endpoint and use available_seats
+        const seatResponse = await fetch(
+          `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || 'none'}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        
+        const seatData = await seatResponse.json();
+
+  const response = await fetch(
+          `${API_BASE_URL}/events/${eventId}/remaining-capacity?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
         // ✅ First, trigger manual cleanup to release any expired locks
         try {
           await fetch(`${API_BASE_URL}/temp-bookings/test-cleanup`, {
@@ -271,17 +340,6 @@ useEffect(() => {
           console.warn('Cleanup trigger failed (non-critical):', cleanupError);
         }
 
-        // ✅ For configure: Call seat-layouts endpoint and use available_seats
-        const seatResponse = await fetch(
-          `${API_BASE_URL}/seat-layouts/${eventId}?date=${formData.selectedDate}&time=${selectedTime}&language=${formData.language || ''}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        const seatData = await seatResponse.json();
 
         if (seatData.success) {
           remaining = seatData.data.seatLayout.available_seats; // Direct from response
@@ -304,8 +362,9 @@ useEffect(() => {
   fetchRemainingCapacity();
 }, [eventId, formData.selectedDate, selectedTime, formData.language, eventData?.type, eventData?.configureSeats, token, API_BASE_URL]);
 
+  // ✅ Fetch event and interest status together
   useEffect(() => {
-    const fetchEvent = async () => {
+    const fetchEventAndInterest = async () => {
       if (!eventId) {
         toast({
           title: "Error",
@@ -325,13 +384,46 @@ useEffect(() => {
         const data = await response.json();
 
         if (data.success) {
-          setEventData(data.data);
+          // Set initial event data
+          const initialEventData = { ...data.data };
+          // Ensure defaults if not present
+          initialEventData.userInterested = initialEventData.userInterested ?? false;
+          initialEventData.isInterested = initialEventData.isInterested ?? 0;
+          setEventData(initialEventData);
+
           if (data.data.status === "inactive") {
             toast({
               title: "Notice",
               description: "This event is currently inactive.",
               variant: "destructive",
             });
+          }
+
+          // If token present, fetch latest interest status
+          if (token && initialEventData._id) {
+            try {
+              const interestRes = await fetch(`${API_BASE_URL}/events/${initialEventData._id}/interest`, {
+                method: 'PATCH',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              });
+
+              if (interestRes.ok) {
+                const interestData = await interestRes.json();
+                if (interestData.success) {
+                  setEventData((prev: any) => ({
+                    ...prev,
+                    userInterested: interestData.data?.userInterested ?? prev.userInterested,
+                    isInterested: interestData.data?.isInterested ?? prev.isInterested,
+                  }));
+                }
+              } else {
+                console.warn('Failed to fetch interest status:', interestRes.status);
+              }
+            } catch (interestErr) {
+              console.error('Error fetching interest status:', interestErr);
+            }
           }
         } else {
           toast({
@@ -349,8 +441,8 @@ useEffect(() => {
       }
     };
 
-    fetchEvent();
-  }, [eventId, toast]);
+    fetchEventAndInterest();
+  }, [eventId, toast, token, API_BASE_URL]);
 
   useEffect(() => {
     let count = 0;
@@ -503,7 +595,7 @@ useEffect(() => {
     try {
       setEventData((prev: any) => {
         if (!prev) return prev;
-        const isCurrentlyInterested = prev.userInterested;
+        const isCurrentlyInterested = prev.userInterested ?? false;
         return {
           ...prev,
           userInterested: !isCurrentlyInterested,
@@ -826,7 +918,7 @@ const handleBook = () => {
                 </div>
               </div>
 
-              {formData.selectedDate && selectedTime && (
+              {showSeparateTime && formData.selectedDate && selectedTime && (
                 <div className="flex items-center space-x-1">
                   <Clock className="w-3 h-3 text-heritage-burgundy" />
                   <div>
@@ -847,6 +939,7 @@ const handleBook = () => {
                       options={availableLanguages}
                       disabled={!formData.selectedDate || !eventData || availableLanguages.length === 0 || isInactive}
                       displayFormatter={lang => languageMap[lang] || lang}
+                      getTimeForLang={isConfigure && !isWalking ? getTimeForLang : undefined}
                     />
                   </div>
                 </div>
@@ -904,7 +997,9 @@ const handleBook = () => {
                 <div className="flex items-center justify-between py-1 px-2 border border-heritage-burgundy/20 rounded-lg bg-white/50">
                   <div className="flex items-center space-x-1">
                     <p className="text-xs font-medium">Children</p>
-                    <span className="text-[10px] bg-red-500 text-white px-1 py-0 rounded font-medium">{eventData?.childDiscountPercentage || 10}% OFF</span>
+                    {eventData?.childDiscountPercentage > 0 && (
+                      <span className="text-[10px] bg-red-500 text-white px-1 py-0 rounded font-medium">{eventData.childDiscountPercentage}% OFF</span>
+                    )}
                   </div>
                   <div className="flex items-center space-x-1">
                     <Button
@@ -1062,7 +1157,7 @@ const handleBook = () => {
         </div>
       </div>
 
-      {formData.selectedDate && selectedTime && (
+      {showSeparateTime && formData.selectedDate && selectedTime && (
         <div className="flex items-start space-x-3 mb-2">
           <Clock className="w-5 h-5 text-heritage-burgundy mt-1 flex-shrink-0" />
           <div>
@@ -1083,6 +1178,7 @@ const handleBook = () => {
               options={availableLanguages}
               disabled={!formData.selectedDate || !eventData || availableLanguages.length === 0 || isInactive}
               displayFormatter={(lang) => languageMap[lang] || lang}
+              getTimeForLang={isConfigure && !isWalking ? getTimeForLang : undefined}
             />
           </div>
         </div>
@@ -1143,7 +1239,9 @@ const handleBook = () => {
         <div className="flex items-center justify-between py-3 px-4 border border-heritage-burgundy/20 rounded-lg bg-white/50">
           <div className="flex items-center space-x-2">
             <p className="font-medium text-foreground">Children</p>
-            <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-medium">{eventData?.childDiscountPercentage || 10}% OFF</span>
+            {eventData?.childDiscountPercentage > 0 && (
+              <span className="text-xs bg-red-500 text-white px-2 py-1 rounded font-medium">{eventData.childDiscountPercentage}% OFF</span>
+            )}
           </div>
           <div className="flex items-center space-x-3">
             <Button

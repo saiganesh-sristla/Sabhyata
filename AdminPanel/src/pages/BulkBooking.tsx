@@ -1,14 +1,14 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
+import { useToast } from "../hooks/use-toast";
+import { Button } from "../components/ui/button";
 import { Calendar, Clock, LocateFixedIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "../components/ui/dialog";
 
 interface SeatData {
   seatId: string;
@@ -157,13 +157,7 @@ const UserSeatMap: React.FC<UserSeatMapProps> = ({ onClose }) => {
           userAgent
         );
       const isSmallScreen = window.innerWidth <= 768;
-      const isMobileNow = isMobileDevice || isSmallScreen;
-      setIsMobile(isMobileNow);
-      
-      // Set default zoom based on device type (only on first load)
-      if (!isInitialized.current) {
-        setZoomLevel(0.7);
-      }
+      setIsMobile(isMobileDevice || isSmallScreen);
     };
 
     checkDeviceCapabilities();
@@ -381,11 +375,6 @@ const UserSeatMap: React.FC<UserSeatMapProps> = ({ onClose }) => {
       dpr,
     });
     setCanvasSize({ width, height });
-    
-    // Set default offset to move canvas left by 30% on desktop (only on first load)
-      if (!isInitialized.current) {
-        setOffset({ x: isMobile ? width * -2.3 : width * -0.5, y: -gridSize * 2.5 });
-      }
   }, [isMobile]);
 
   // Helper functions for touch events
@@ -950,31 +939,31 @@ const UserSeatMap: React.FC<UserSeatMapProps> = ({ onClose }) => {
         }
       });
 
-      // Draw section labels
-const sectionsMap: Record<
-  string,
-  { xSum: number; ySum: number; count: number; maxY: number }
-> = {};
-seats.forEach((s) => {
-  if (!s.section) return;
-  if (!sectionsMap[s.section])
-    sectionsMap[s.section] = { xSum: 0, ySum: 0, count: 0, maxY: -Infinity };
-  sectionsMap[s.section].xSum += s.coords.x;
-  sectionsMap[s.section].ySum += s.coords.y;
-  sectionsMap[s.section].count += 1;
-  if (s.coords.y > sectionsMap[s.section].maxY)
-    sectionsMap[s.section].maxY = s.coords.y;
-});
-Object.keys(sectionsMap).forEach((name) => {
-  const info = sectionsMap[name];
-  const cx = info.xSum / info.count;
-  const cy = info.maxY + gridSize * 1.2;
-  ctx.fillStyle = "#1F2937";
-  ctx.font = `bold ${16 / zoomLevel}px Arial`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText(name, cx, cy);
-});
+      const sectionsMap: Record<
+        string,
+        { xSum: number; ySum: number; count: number; minY: number }
+      > = {};
+      seats.forEach((s) => {
+        if (!s.section) return;
+        if (!sectionsMap[s.section])
+          sectionsMap[s.section] = { xSum: 0, ySum: 0, count: 0, minY: Infinity };
+        sectionsMap[s.section].xSum += s.coords.x;
+        sectionsMap[s.section].ySum += s.coords.y;
+        sectionsMap[s.section].count += 1;
+        if (s.coords.y < sectionsMap[s.section].minY)
+          sectionsMap[s.section].minY = s.coords.y;
+      });
+
+      Object.keys(sectionsMap).forEach((name) => {
+        const info = sectionsMap[name];
+        const cx = info.xSum / info.count;
+        const cy = info.minY - gridSize * 1.2;
+        ctx.fillStyle = "#1F2937";
+        ctx.font = `bold ${16 / zoomLevel}px Arial`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "bottom";
+        ctx.fillText(name, cx, cy);
+      });
 
       ctx.restore();
     },
@@ -1194,15 +1183,8 @@ const handleProceed = async () => {
                 <p className="flex items-center gap-2 text-sm">
                   <Calendar size={14} />
                   {selectedDate ? new Date(selectedDate).toLocaleDateString() : "N/A"}
-                 <Clock size={14} />
-{selectedTime
-  ? new Date(`1970-01-01T${selectedTime}:00`).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    })
-  : "N/A"}
-
+                  <Clock size={14} />
+                  {selectedTime || "N/A"}
                   <LocateFixedIcon size={14} />
                   {eventData?.venue || "N/A"}
                 </p>

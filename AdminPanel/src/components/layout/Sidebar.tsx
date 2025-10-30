@@ -9,7 +9,7 @@ import {
   X,
   User,
   LogOut,
-  Menu,
+  Menu, 
   User2,
   Camera
 } from 'lucide-react';
@@ -22,18 +22,19 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Bookings', href: '/bookings', icon: CreditCard },
-  { name: 'Events Management', href: '/events', icon: Calendar },
-  { name: 'Monuments', href: '/monuments', icon: MapPin },
-  { name: 'Users Management', href: '/users', icon: Users },
-  { name: 'Abandoned Carts', href: '/abandoned-carts', icon: ShoppingCart },
-  { name: 'Partner Channel', href: '/partners', icon: User2 },
-  { name: 'QR Scanner', href: '/scanner', icon: Camera },
+  { name: 'Dashboard', href: '/dashboard', icon: BarChart3, roles: ['admin', 'sub-admin'] },  
+  { name: 'Bulk Bookings', href: '/bulk-bookings', icon: CreditCard, roles: ['staff', 'sub-admin'] },
+  { name: 'Bookings', href: '/bookings', icon: CreditCard, roles: ['admin', 'sub-admin'] },
+  { name: 'Events Management', href: '/events', icon: Calendar, roles: ['admin'] },
+  { name: 'Monuments', href: '/monuments', icon: MapPin, roles: ['admin', 'sub-admin'] },
+  { name: 'Users Management', href: '/users', icon: Users, roles: ['admin'] }, // Admin only
+  { name: 'Abandoned Carts', href: '/abandoned-carts', icon: ShoppingCart, roles: ['admin', 'sub-admin'] },
+  { name: 'Partner Channel', href: '/partners', icon: User2, roles: ['admin'] }, // Admin only
+  { name: 'QR Scanner', href: '/scanner', icon: Camera, roles: ['admin', 'sub-admin', 'staff'] },
 ];
 
 const staffnavigation = [ 
-  { name: 'QR Scanner', href: '/scanner', icon: Camera }
+  { name: 'QR Scanner', href: '/scanner', icon: Camera, roles: ['staff'] }
 ]
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -43,7 +44,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const { user, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const isStaff = user?.role === 'staff';
-  const navigationItems = isStaff ? staffnavigation : navigation;
+  
+  // Filter navigation items based on user role
+  const navigationItems = isStaff 
+    ? staffnavigation 
+    : navigation.filter(item => item.roles.includes(user?.role || ''));
 
   const handleLogout = async () => {
     try {

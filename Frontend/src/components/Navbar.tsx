@@ -98,6 +98,9 @@ const Navbar = () => {
         eventsArray = data;
       }
       
+      // Filter only published events
+      eventsArray = eventsArray.filter(event => event.status === "published");
+      
       setFilteredEvents(eventsArray.slice(0, 6));
       setShowSuggestions(true);
     } catch (err) {

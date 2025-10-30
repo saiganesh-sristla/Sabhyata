@@ -16,7 +16,7 @@ const adminPartnerRoutes = require('./adminPartners');
 
 // Apply authentication and admin role restriction to all routes
 router.use(protect);
-router.use(restrictTo('admin'));
+router.use(restrictTo('admin','sub-admin'));
 
 // Mount individual route modules
 router.use('/dashboard', dashboardRoutes);

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { FaEdit } from "react-icons/fa";
+import { FaCalendar, FaEdit, FaLocationArrow } from "react-icons/fa";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Locate, MapIcon, MapPin, Timer } from "lucide-react";
 
 const UserProfile = () => {
   const { isAuthenticated, user: auth0User } = useAuth0();
@@ -474,23 +475,28 @@ const fetchBookings = async () => {
                   </div>
                   
                   {booking.event?.venue && (
-                    <p className="text-sm text-gray-600 mb-2">
-                      📍 {booking.event.venue}
+                    <p className="flex gap-1 text-sm text-gray-600 mb-2">
+                      <MapPin size={16}/> {booking.event.venue}
                     </p>
                   )}
-                  
-                  <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                    {booking.type && <span>📋 {booking.type}</span>}
-                    {booking.date && <span>📅 {formatDate(booking.date)}</span>}
-                    {booking.createdAt && !booking.date && <span>📅 {formatDate(booking.createdAt)}</span>}
-                    {booking.time && <span>🕒 {booking.time}</span>}
-                    {booking.duration && <span>⏱️ {booking.duration}</span>}
-                    {(booking.bookingReference || booking._id || booking.id) && (
-                      <span className="font-mono">
-                        Ref: {booking.bookingReference || booking._id?.slice(-6) || booking.id?.slice(-6)}
-                      </span>
-                    )}
-                  </div>
+
+                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                  {booking.date && (
+                    <span className="flex items-center gap-1">
+                      <FaCalendar /> {formatDate(booking.date)}
+                    </span>
+                  )}
+                  {booking.time && (
+                    <span className="flex items-center gap-1">
+                      <Timer size={18}/> {booking.time}
+                    </span>
+                  )}
+                  {(booking.bookingReference || booking._id || booking.id) && (
+                    <span className="flex items-center gap-1 font-mono">
+                      Ref: {booking.bookingReference || booking._id?.slice(-6) || booking.id?.slice(-6)}
+                    </span>
+                  )}
+                </div>
                   
                   {(booking.tickets?.length > 0 || booking.seats?.length > 0 || (booking.adults > 0 || booking.children > 0)) && (
                     <div className="mt-2 pt-2 border-t border-gray-100">

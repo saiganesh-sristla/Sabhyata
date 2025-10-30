@@ -9,6 +9,8 @@ import {
   AlertTriangle,
   MessageCircle,
   Mail,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { encryptQRData } from '@/lib/qrEncryption';
@@ -22,7 +24,8 @@ export default function BookingConfirmation() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
-  const ticketRef = useRef(null);
+  const [currentTicketIndex, setCurrentTicketIndex] = useState(0);
+  const ticketRefs = useRef({}); // Ref object for each ticket
   const printTriggeredRef = useRef(false);
 
   const API_URL =
@@ -144,170 +147,98 @@ export default function BookingConfirmation() {
   const tickets = generateTickets();
 
   const handleDownloadTicket = async () => {
-    if (!ticketRef.current) return;
+    if (tickets.length === 0) return;
 
     try {
-      const canvas = await html2canvas(ticketRef.current, { 
-        scale: 3, 
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: ticketRef.current.scrollWidth,
-        height: ticketRef.current.scrollHeight,
-      });
-      const imgData = canvas.toDataURL("image/png");
       const doc = new jsPDF("p", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       const imgWidth = pageWidth - 30; // 15mm margins on each side
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const imgHeight = (pageHeight - 40); // Fit to page height minus margins
       const imgX = 15;
       let imgY = 20;
 
-      // If image height exceeds page height, scale down
-      if (imgHeight > pageHeight - 40) {
-        const scaleFactor = (pageHeight - 40) / imgHeight;
-        imgHeight = pageHeight - 40;
-        imgWidth *= scaleFactor;
+      for (let i = 0; i < tickets.length; i++) {
+        // Temporarily set current index to render the specific ticket
+        setCurrentTicketIndex(i);
+
+        // Wait a tick for re-render
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (ticketRefs.current[i]) {
+          const canvas = await html2canvas(ticketRefs.current[i], { 
+            scale: 3, 
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            width: ticketRefs.current[i].scrollWidth,
+            height: ticketRefs.current[i].scrollHeight,
+          });
+
+          const imgData = canvas.toDataURL("image/png");
+          const actualImgHeight = (canvas.height * imgWidth) / canvas.width;
+
+          // Add new page if not first
+          if (i > 0) {
+            doc.addPage();
+          }
+
+          // Scale if too tall
+          if (actualImgHeight > pageHeight - 40) {
+            const scaleFactor = (pageHeight - 40) / actualImgHeight;
+            const scaledWidth = imgWidth * scaleFactor;
+            doc.addImage(imgData, "PNG", imgX, imgY, scaledWidth, pageHeight - 40);
+          } else {
+            doc.addImage(imgData, "PNG", imgX, imgY, imgWidth, actualImgHeight);
+          }
+        }
       }
 
-      doc.addImage(imgData, "PNG", imgX, imgY, imgWidth, imgHeight);
-      doc.save(`ticket_${bookingData?.bookingReference || id}.pdf`);
+      // Reset to first ticket
+      setCurrentTicketIndex(0);
+
+      doc.save(`tickets_${bookingData?.bookingReference || id}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     }
   };
 
   const handlePrintTicket = () => {
-    if (!ticketRef.current || printTriggeredRef.current || isPrinting) return;
+    if (tickets.length === 0 || printTriggeredRef.current || isPrinting) return;
 
     printTriggeredRef.current = true;
     setIsPrinting(true);
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    
-    document.body.appendChild(iframe);
+    // For print, we'll generate a single printable page with all tickets stacked vertically
+    const printContainer = document.createElement('div');
+    printContainer.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+      background: white; z-index: 9999; padding: 20px; overflow-y: auto;
+      font-family: system-ui, sans-serif;
+    `;
 
-    const iframeDoc = iframe.contentWindow || iframe.contentDocument;
-    if (iframeDoc.document) {
-      const doc = iframeDoc.document;
-      const ticketClone = ticketRef.current.cloneNode(true);
-      
-      const getAllStyles = () => {
-        let styles = '';
-        const styleSheets = Array.from(document.styleSheets);
-        styleSheets.forEach(sheet => {
-          try {
-            const rules = Array.from(sheet.cssRules || sheet.rules);
-            rules.forEach(rule => {
-              styles += rule.cssText + '\n';
-            });
-          } catch (e) {
-            // Skip external stylesheets
-          }
-        });
-        return styles;
-      };
-
-      doc.open();
-      doc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Print Ticket - ${bookingData?.bookingReference || id}</title>
-            <meta charset="UTF-8">
-            <style>
-              ${getAllStyles()}
-              
-              * {
-                margin: 0;
-                padding: 0;
-                box-sizing: border-box;
-              }
-              
-              body {
-                font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                padding: 20px;
-                background: white;
-              }
-              
-              @media print {
-                body {
-                  padding: 0;
-                  -webkit-print-color-adjust: exact;
-                  print-color-adjust: exact;
-                }
-                @page {
-                  margin: 1cm;
-                  size: A4;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            ${ticketClone.outerHTML}
-          </body>
-        </html>
-      `);
-      doc.close();
-
+    // Clone and stack all tickets
+    tickets.forEach((ticket, index) => {
+      setCurrentTicketIndex(index);
+      // Wait for re-render, then clone
       setTimeout(() => {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-        
-        setTimeout(() => {
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-          printTriggeredRef.current = false;
-          setIsPrinting(false);
-        }, 500);
-      }, 500);
-    }
-  };
+        if (ticketRefs.current[index]) {
+          const ticketClone = ticketRefs.current[index].cloneNode(true);
+          printContainer.appendChild(ticketClone);
+        }
+      }, index * 100);
+    });
 
-  const generateTicketPDF = async () => {
-    if (!ticketRef.current) return null;
+    document.body.appendChild(printContainer);
+    window.print();
 
-    try {
-      const canvas = await html2canvas(ticketRef.current, { 
-        scale: 3, 
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        width: ticketRef.current.scrollWidth,
-        height: ticketRef.current.scrollHeight,
-      });
-      const imgData = canvas.toDataURL("image/png");
-      const doc = new jsPDF("p", "mm", "a4");
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const imgWidth = pageWidth - 30; // 15mm margins on each side
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const imgX = 15;
-      let imgY = 20;
-
-      // If image height exceeds page height, scale down
-      if (imgHeight > pageHeight - 40) {
-        const scaleFactor = (pageHeight - 40) / imgHeight;
-        imgHeight = pageHeight - 40;
-        imgWidth *= scaleFactor;
-      }
-
-      doc.addImage(imgData, "PNG", imgX, imgY, imgWidth, imgHeight);
-      return doc.output('blob');
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      return null;
-    }
+    setTimeout(() => {
+      document.body.removeChild(printContainer);
+      printTriggeredRef.current = false;
+      setIsPrinting(false);
+      setCurrentTicketIndex(0);
+    }, 1000);
   };
 
   const handleShareWhatsApp = async () => {
@@ -387,6 +318,77 @@ export default function BookingConfirmation() {
     );
   }
 
+  const currentTicket = tickets[currentTicketIndex];
+  const seatLabel = currentTicket?.seatLabel || (seatsList?.length > 0
+    ? (typeof seatsList[currentTicketIndex] === 'string'
+        ? seatsList[currentTicketIndex]
+        : seatsList[currentTicketIndex]?.seatId || `Seat ${currentTicketIndex + 1}`)
+    : `${currentTicket?.type?.charAt(0).toUpperCase() + currentTicket?.type?.slice(1)} ${currentTicketIndex + 1}`);
+
+  // Generate QR data for current ticket
+  const originalData = {
+    bookingId: id,
+    bookingReference: bookingData?.bookingReference,
+    ticketId: currentTicket?.ticketId,
+    eventName: eventName,
+    seat: seatLabel,
+    date: eventDate,
+    time: eventTime,
+    timestamp: Date.now()
+  };
+  const encryptedData = encryptQRData(originalData);
+
+  const nextTicket = () => setCurrentTicketIndex((prev) => (prev + 1) % tickets.length);
+  const prevTicket = () => setCurrentTicketIndex((prev) => (prev - 1 + tickets.length) % tickets.length);
+
+  const generateTicketPDF = async () => {
+    if (tickets.length === 0) return null;
+
+    try {
+      const doc = new jsPDF("p", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const imgWidth = pageWidth - 30;
+      let imgY = 20;
+
+      for (let i = 0; i < tickets.length; i++) {
+        setCurrentTicketIndex(i);
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (ticketRefs.current[i]) {
+          const canvas = await html2canvas(ticketRefs.current[i], { 
+            scale: 3, 
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            width: ticketRefs.current[i].scrollWidth,
+            height: ticketRefs.current[i].scrollHeight,
+          });
+
+          const imgData = canvas.toDataURL("image/png");
+          const actualImgHeight = (canvas.height * imgWidth) / canvas.width;
+
+          if (i > 0) doc.addPage();
+
+          if (actualImgHeight > pageHeight - 40) {
+            const scaleFactor = (pageHeight - 40) / actualImgHeight;
+            const scaledWidth = imgWidth * scaleFactor;
+            doc.addImage(imgData, "PNG", 15, imgY, scaledWidth, pageHeight - 40);
+          } else {
+            doc.addImage(imgData, "PNG", 15, imgY, imgWidth, actualImgHeight);
+          }
+        }
+      }
+
+      setCurrentTicketIndex(0);
+      return doc.output('blob');
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-lg mx-auto bg-white rounded-lg shadow-sm">
@@ -402,188 +404,181 @@ export default function BookingConfirmation() {
           </p>
         </div>
 
-        <div ref={ticketRef} className="mx-4 mb-6 relative">
-          {/* Watermark */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden">
-            <img
-              src="https://i.ibb.co/RTdCGXqg/image.png"
-              alt="Watermark"
-              className="opacity-5"
-              style={{
-                width: '400px',
-                transform: 'rotate(-45deg)',
-              }}
-              crossOrigin="anonymous"
-            />
-          </div>
-
-          {/* Logo at top */}
-          <div className="flex justify-center py-3 bg-white rounded-t-lg border-l border-r border-t border-gray-200">
-            <img
-              src="https://i.ibb.co/RTdCGXqg/image.png"
-              alt="Sabhyata Foundation"
-              className="h-10"
-              crossOrigin="anonymous"
-            />
-          </div>
-
-          <div className="bg-red-700 text-white p-3 flex justify-between items-center relative z-20">
-            <div>
-              <div className="text-xs font-medium">E-TICKET</div>
-              <div className="text-xs opacity-90">Booking Ref: {bookingData?.bookingReference || id}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs">Valid for Entry</div>
-              <div className="text-xs opacity-90">{eventDate}</div>
-            </div>
-          </div>
-
-          <div className="border-l border-r border-gray-200 p-4 relative z-20">
-            <div className="flex gap-3 mb-4">
-              <img
-                src={
-                  bookingData?.event?.images?.[0]
-                    ? `https://sabhyata.onrender.com/${bookingData.event.images[0]}`
-                    : "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=80&h=80&fit=crop"
-                }
-                alt={eventName}
-                className="w-16 h-16 object-cover rounded"
-                crossOrigin="anonymous"
-              />
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 mb-1">
-                  {eventName}
-                </h3>
-                <div className="space-y-1 text-xs text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <span>📍</span>
-                    <span>{venue}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>📅</span>
-                    <span>{eventDate}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span>🕒</span>
-                    <span>{eventTime}</span>
-                  </div>
-                </div>
+        <div className="mb-6">
+          {tickets.map((ticket, index) => (
+            <div
+              key={ticket.ticketId}
+              ref={(el) => (ticketRefs.current[index] = el)}
+              className={`mx-4 mb-6 relative ${index === currentTicketIndex ? 'block' : 'hidden'}`}>
+              {/* Watermark */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 overflow-hidden">
+                <img
+                  src="https://i.ibb.co/RTdCGXqg/image.png"
+                  alt="Watermark"
+                  className="opacity-10"
+                  style={{
+                    width: '400px',
+                    transform: 'rotate(-45deg)',
+                  }}
+                  crossOrigin="anonymous"
+                />
               </div>
-            </div>
 
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <div className="text-xs text-gray-600 mb-1">
-                  {bookingData.seats?.length > 0
-                    ? "SEAT DETAILS"
-                    : "PARTICIPANT DETAILS"}
-                </div>
-                <div className="font-semibold text-lg">
-                  {seats || `${ticketCount} Participants`}
-                </div>
-                <div className="text-xs text-gray-600">
-                  {bookingData?.event?.type === "walking"
-                    ? "Walking Tour"
-                    : bookingData?.event?.configureSeats
-                    ? "Configured Seating"
-                    : "Normal Section"}
-                </div>
+              {/* Logo at top */}
+              <div className="flex justify-center py-3 bg-white rounded-t-lg border-l border-r border-t border-gray-200">
+                <img
+                  src="https://i.ibb.co/RTdCGXqg/image.png"
+                  alt="Sabhyata Foundation"
+                  className="h-10"
+                  crossOrigin="anonymous"
+                />
               </div>
-              <div className="text-right">
-                <div className="text-xs text-gray-600 mb-1">TOTAL AMOUNT</div>
-                <div className="font-semibold text-lg text-red-600">
-                  {totalAmount}
-                </div>
-                <div className="text-xs text-gray-600">
-                  {ticketCount} Tickets
-                </div>
-              </div>
-            </div>
 
-            <div className="text-center mb-4">
-              <div className="text-xs text-gray-600 mb-2">SCAN FOR ENTRY</div>
-               <div className="flex justify-center gap-4 flex-wrap">
-      {tickets.map((ticket, index) => {
-        const seatLabel = ticket.seatLabel || (seatsList?.length > 0
-          ? (typeof seatsList[index] === 'string'
-              ? seatsList[index]
-              : seatsList[index]?.seatId || `Seat ${index + 1}`)
-          : `${ticket.type.charAt(0).toUpperCase() + ticket.type.slice(1)} ${index + 1}`);
-
-        // ✅ ORIGINAL DATA (NOT ENCRYPTED)
-        const originalData = {
-          bookingId: id,
-          bookingReference: bookingData?.bookingReference,
-          ticketId: ticket.ticketId,
-          eventName: eventName,
-          seat: seatLabel,
-          date: eventDate,
-          time: eventTime,
-          timestamp: Date.now() // Add timestamp to prevent replay attacks
-        };
-
-        // ✅ ENCRYPT THE DATA
-        const encryptedData = encryptQRData(originalData);
-
-        console.log('Original:', originalData);
-        console.log('Encrypted:', encryptedData);
-
-        return (
-          <div key={ticket.ticketId} className="text-center">
-            <div className="text-xs font-medium mb-1">
-              P{index + 1} - {seatLabel} {ticket.isUsed ? "(Used)" : ""}
-            </div>
-            <div className="w-24 h-24 p-2 bg-white border-2 border-red-600 rounded flex items-center justify-center mx-auto">
-              <QRCode
-                value={encryptedData} // ✅ QR contains encrypted data
-                size={80}
-                level="H"
-              />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-            </div>
-
-            {/* Important Note */}
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-              <div className="flex gap-2">
-                <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-2" />
+              <div className="bg-red-700 text-white p-3 flex justify-between items-center relative z-20">
                 <div>
-                  <h4 className="text-sm font-medium text-yellow-800 mb-1">
-                    Important Note
-                  </h4>
-                  <p className="text-xs text-yellow-700">
-                    Please carry a valid ID for entry. Gates open 1 hour before the
-                    show. No outside food or beverages allowed.
-                  </p>
+                  <div className="text-xs font-medium">E-TICKET</div>
+                  <div className="text-xs opacity-90">Booking Ref: {bookingData?.bookingReference || id}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-xs">Valid for Entry</div>
+                  <div className="text-xs opacity-90">{eventDate}</div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-red-700 text-white text-center py-3 rounded-b-lg relative z-20">
-            <p className="text-xs font-medium">
-              *Present this QR code at the venue entrance*
-            </p>
-          </div>
+              <div className="border-l border-r border-gray-200 p-4 relative z-20">
+                <div className="flex gap-3 mb-4">
+                  <img
+                    src={
+                      bookingData?.event?.images?.[0]
+                        ? `https://sabhyata.onrender.com/${bookingData.event.images[0]}`
+                        : "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=80&h=80&fit=crop"
+                    }
+                    alt={eventName}
+                    className="w-24 h-18 object-cover rounded"
+                    crossOrigin="anonymous"
+                  />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">
+                      {eventName}
+                    </h3>
+                    <div className="space-y-1 text-xs text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <span>📍</span>
+                        <span>{venue}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>📅</span>
+                        <span>{eventDate}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span>🕒</span>
+                        <span>{eventTime}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>              
+
+              <div>
+                <div className="text-center mb-4 mt-10">
+                  <div className="text-xs text-gray-600 mb-2">SCAN FOR ENTRY</div>
+                  <div className="w-48 h-48 p-2 bg-white border-2 border-red-600 rounded flex items-center justify-center mx-auto">
+                    <QRCode
+                      value={encryptedData}
+                      size={170}
+                      level="H"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-start mb-4 -mt-10">
+                  <div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      {bookingData.seats?.length > 0
+                        ? "SEAT DETAILS"
+                        : "PARTICIPANT DETAILS"}
+                    </div>
+                    <div className="font-semibold text-lg">
+                      {seatLabel}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {bookingData?.event?.type === "walking"
+                        ? "Walking Tour"
+                        : bookingData?.event?.configureSeats
+                        ? "Configured Seating"
+                        : "Normal Section"}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-gray-600 mb-1">TOTAL AMOUNT</div>
+                    <div className="font-semibold text-lg text-red-600">
+                      {totalAmount}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {tickets.length} Tickets
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+                {/* Important Note */}
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                  <div className="flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="text-sm font-medium text-yellow-800 mb-1">
+                        Important Note
+                      </h4>
+                      <p className="text-xs text-yellow-700">
+                        Please carry a valid ID for entry. Gates open 1 hour before the
+                        show. No outside food or beverages allowed.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-red-700 text-white text-center py-3 rounded-b-lg relative z-20">
+                <p className="text-xs font-medium">
+                  *Present this QR code at the venue entrance*
+                </p>
+              </div>
+            </div>
+          ))}
+
+          {/* Carousel Navigation */}
+          {tickets.length > 1 && (
+            <div className="flex justify-center items-center gap-4 mx-4 pb-4">
+              <button
+                onClick={prevTicket}
+                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm text-gray-600">
+                Ticket {currentTicketIndex + 1} of {tickets.length}
+              </span>
+              <button
+                onClick={nextTicket}
+                className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="px-4 mb-6">
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleDownloadTicket}
-              className="bg-red-700 text-white py-3 rounded-md flex items-center justify-center gap-2 text-sm font-medium hover:bg-red-800"
-            >
+              className="bg-red-700 text-white py-3 rounded-md flex items-center justify-center gap-2 text-sm font-medium hover:bg-red-800">
               <Download className="w-4 h-4" />
-              Download Ticket
+              Download Ticket{tickets.length > 1 ? 's' : ''}
             </button>
             <button
               onClick={handlePrintTicket}
               disabled={isPrinting}
-              className="border border-red-700 text-red-700 py-3 rounded-md flex items-center justify-center gap-2 text-sm font-medium hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
+              className="border border-red-700 text-red-700 py-3 rounded-md flex items-center justify-center gap-2 text-sm font-medium hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed">
               {isPrinting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-700"></div>
@@ -592,13 +587,14 @@ export default function BookingConfirmation() {
               ) : (
                 <>
                   <Printer className="w-4 h-4" />
-                  Print Ticket
+                  Print All Tickets
                 </>
               )}
             </button>
           </div>
         </div>
 
+        {/* Share Section - Hidden for now */}
         {/* <div className="px-4 mb-6">
           <h3 className="text-sm font-medium text-gray-900 mb-3">
             Share Your Ticket

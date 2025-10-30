@@ -13,6 +13,7 @@ const Bookings: React.FC = () => {
   const [paymentFilter, setPaymentFilter] = useState("All Payment Methods");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [eventDate, setEventDate] = useState("");
   const [bookings, setBookings] = useState<any[]>([]);
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -26,6 +27,8 @@ const Bookings: React.FC = () => {
     totalRevenue: 0,
     pendingPayments: 0,
     cancelledBookings: 0,
+    totalCancelled: 0,
+    totalRefund: 0,
     paymentMethodStats: [],
     upcomingBookings: 0,
     pastBookings: 0,
@@ -37,9 +40,6 @@ const Bookings: React.FC = () => {
     setLoading(true);
     try {
       const params: any = { page, limit: pagination.limit };
-      
-      // Exclude pending payment status bookings
-      params.excludePendingPayments = true;
       
       if (searchTerm) params.search = searchTerm;
       if (statusFilter !== "All") {
@@ -55,23 +55,19 @@ const Bookings: React.FC = () => {
         }
       }
       if (channelsFilter !== "All Channels") {
-        params.channel = channelsFilter.toLowerCase();
+        params.channel = channelsFilter;
       }
       if (paymentFilter !== "All Payment Methods") {
         params.paymentMethod = paymentFilter.toLowerCase();
       }
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
+      if (eventDate) params.eventDate = eventDate;
 
       const response = await adminAPI.getBookings(params);
       console.log(response.data.data.bookings);
       
-      // Client-side filter to ensure pending payments are excluded
-      const filteredBookings = response.data.data.bookings.filter(
-        (booking: any) => booking.paymentStatus !== "pending"
-      );
-      
-      setBookings(filteredBookings);
+      setBookings(response.data.data.bookings);
       setPagination(response.data.data.pagination);
     } catch (err) {
       console.error("Failed to fetch bookings:", err);
@@ -105,6 +101,7 @@ const Bookings: React.FC = () => {
     paymentFilter,
     startDate,
     endDate,
+    eventDate,
   ]);
 
   useEffect(() => {
@@ -152,7 +149,6 @@ const Bookings: React.FC = () => {
   const handleExport = async () => {
     try {
       const params: any = {};
-      params.excludePendingPayments = true;
       
       if (searchTerm) params.search = searchTerm;
       if (statusFilter !== "All") {
@@ -167,13 +163,14 @@ const Bookings: React.FC = () => {
         }
       }
       if (channelsFilter !== "All Channels") {
-        params.channel = channelsFilter.toLowerCase();
+        params.channel = channelsFilter;
       }
       if (paymentFilter !== "All Payment Methods") {
         params.paymentMethod = paymentFilter.toLowerCase();
       }
       if (startDate) params.startDate = startDate;
       if (endDate) params.endDate = endDate;
+      if (eventDate) params.eventDate = eventDate;
 
       const response = await adminAPI.exportBookings(params);
       
@@ -280,27 +277,42 @@ const Bookings: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-md w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-          />
-          <input
-            type="date"
-            className="px-4 py-2 border border-gray-300 rounded-md w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-          />
+          <div className="flex gap-2 items-center">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Booking:</label>
+            <input
+              type="date"
+              className="px-4 py-2 border border-gray-300 rounded-md w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              placeholder="Start"
+            />
+            <input
+              type="date"
+              className="px-4 py-2 border border-gray-300 rounded-md w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              placeholder="End"
+            />
+          </div>
+          <div className="flex gap-2 items-center">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Event Date:</label>
+            <input
+              type="date"
+              className="px-4 py-2 border border-gray-300 rounded-md w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              placeholder="Select Date"
+            />
+          </div>
              <select
             className="px-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={channelsFilter}
             onChange={(e) => setChannelsFilter(e.target.value)}
           >
-            <option>All Channels</option>
-            <option>Manual</option>
-            <option>BookMyShow</option>
-            <option>Website</option>
+            <option value="All Channels">All Channels</option>
+            <option value="manual">Manual</option>
+            <option value="bookmyshow">BookMyShow</option>
+            <option value="website">Website</option>
           </select>
           <select
             className="px-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -357,8 +369,8 @@ const Bookings: React.FC = () => {
         </div>
       </div>
 
-      {/* Summary Cards - Only Total Revenue */}
-      <div className="gap-4 mb-6 max-w-screen-xl overflow-x-auto">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
@@ -367,7 +379,39 @@ const Bookings: React.FC = () => {
             <div>
               <p className="text-sm text-gray-600">Total Revenue</p>
               <p className="text-xl font-bold text-gray-900">
-                ₹{analytics.totalRevenue.toLocaleString()}
+                {analytics.totalRevenue != null
+                  ? `₹${analytics.totalRevenue.toLocaleString()}`
+                  : "₹0"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+              <span className="text-red-600 font-bold">✕</span>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Total Cancelled</p>
+              <p className="text-xl font-bold text-gray-900">
+                {analytics.totalCancelled != null
+                  ? `₹${analytics.totalCancelled.toLocaleString()}`
+                  : "₹0"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+              <span className="text-orange-600 font-bold">↩</span>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">Total Refund</p>
+              <p className="text-xl font-bold text-gray-900">
+                {analytics.totalRefund != null
+                  ? `₹${analytics.totalRefund.toLocaleString()}`
+                  : "₹0"}
               </p>
             </div>
           </div>
@@ -518,10 +562,10 @@ const Bookings: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">
-                          {booking.contactInfo?.name}
+                          {booking.contactInfo?.name || booking.user?.name || 'N/A'}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {booking.contactInfo?.phone}
+                          {booking.contactInfo?.phone || booking.user?.phone || 'N/A'}
                         </div>
                       </div>
                     </td>
@@ -531,21 +575,19 @@ const Bookings: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900">
-                        {new Date(booking.createdAt).toLocaleDateString()}
-                      </span>
-                      <div className="text-sm text-gray-500">
-                        {new Date(booking.createdAt).toLocaleTimeString()}
+                      <div className="text-sm text-gray-900">
+                        {new Date(booking.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(booking.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {new Date(booking.date).toLocaleDateString()}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {booking?.time}
-                        </div>
+                      <div className="text-sm text-gray-900">
+                        {new Date(booking.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {booking?.time}
                       </div>
                     </td>
                    <td className="px-6 py-4 whitespace-nowrap flex flex-col gap-1 text-center">
@@ -561,17 +603,12 @@ const Bookings: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          booking.channel === "bookmyshow"
-                            ? "bg-purple-100 text-purple-800"
-                            : booking.channel === "website"
+                          booking.bookingType === "user"
                             ? "bg-blue-100 text-blue-800"
                             : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        {booking.channel
-                          ? booking.channel.charAt(0).toUpperCase() +
-                            booking.channel.slice(1)
-                          : "Manual"}
+                        {booking.bookingType === "user" ? "Website" : "Manual"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

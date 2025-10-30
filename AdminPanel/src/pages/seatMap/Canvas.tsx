@@ -230,7 +230,7 @@ const SeatMapCanvas: React.FC<SeatMapCanvasProps> = ({
 
   const snapToGrid = (value: number) => Math.round(value / gridSize) * gridSize;
 
-  // Renumber seats within each row after deletions so numbers are sequential left-to-right
+  // Renumber seats within each row after deletions so numbers are sequential right-to-left
   const renumberSeatsByRow = (seatArray: SeatData[]) => {
     // Group seats by row
     const rowsMap: Record<string, SeatData[]> = {};
@@ -249,8 +249,8 @@ const SeatMapCanvas: React.FC<SeatMapCanvasProps> = ({
     const result: SeatData[] = [];
 
     for (const [row, seatsInRow] of rowEntries) {
-      // Sort seats left-to-right by x coordinate
-      const sorted = seatsInRow.slice().sort((a, b) => a.coords.x - b.coords.x);
+      // Sort seats right-to-left by x coordinate (inverted: higher X = lower number)
+      const sorted = seatsInRow.slice().sort((a, b) => b.coords.x - a.coords.x);
       sorted.forEach((seat, idx) => {
         const newNumber = idx + 1;
         const newId = `${row}${newNumber}`;
@@ -262,7 +262,8 @@ const SeatMapCanvas: React.FC<SeatMapCanvasProps> = ({
   };
 
   const getRowLabel = (y: number) => {
-    const rowIndex = Math.floor((y - 100) / gridSize);
+    // Invert row calculation: higher Y values = earlier letters (A at bottom)
+    const rowIndex = Math.floor((canvasSize.height - y) / gridSize);
     if (rowIndex < 26) {
       return String.fromCharCode(65 + rowIndex); // A-Z
     }
@@ -323,7 +324,8 @@ const SeatMapCanvas: React.FC<SeatMapCanvasProps> = ({
     if (selectedTool === "add") {
       if (!clickedSeat) {
         const rowLetter = getRowLabel(snappedY);
-        const seatNumber = Math.floor((snappedX - 100) / gridSize) + 1;
+        // Invert seat number: higher X values = lower numbers (1 at right)
+        const seatNumber = Math.floor((canvasSize.width - snappedX) / gridSize) + 1;
         const seatId = `${rowLetter}${seatNumber}`;
         const defaultCategory =
           effectiveCategories.find((cat) => cat.name === "Bronze") ||
@@ -690,26 +692,26 @@ const SeatMapCanvas: React.FC<SeatMapCanvasProps> = ({
     // Draw section labels
     const sectionsMap: Record<
       string,
-      { xSum: number; ySum: number; count: number; minY: number }
+      { xSum: number; ySum: number; count: number; maxY: number }
     > = {};
     seats.forEach((s) => {
       if (!s.section) return;
       if (!sectionsMap[s.section])
-        sectionsMap[s.section] = { xSum: 0, ySum: 0, count: 0, minY: Infinity };
+        sectionsMap[s.section] = { xSum: 0, ySum: 0, count: 0, maxY: -Infinity };
       sectionsMap[s.section].xSum += s.coords.x;
       sectionsMap[s.section].ySum += s.coords.y;
       sectionsMap[s.section].count += 1;
-      if (s.coords.y < sectionsMap[s.section].minY)
-        sectionsMap[s.section].minY = s.coords.y;
+      if (s.coords.y > sectionsMap[s.section].maxY)
+        sectionsMap[s.section].maxY = s.coords.y;
     });
     Object.keys(sectionsMap).forEach((name) => {
       const info = sectionsMap[name];
       const cx = info.xSum / info.count;
-      const cy = info.minY - gridSize * 1.2;
+      const cy = info.maxY + gridSize * 1.2;
       ctx.fillStyle = "#374151";
       ctx.font = `bold ${14 / zoom}px Arial`;
       ctx.textAlign = "center";
-      ctx.textBaseline = "bottom";
+      ctx.textBaseline = "top";
       ctx.fillText(name, cx, cy);
     });
 

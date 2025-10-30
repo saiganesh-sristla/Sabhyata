@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { FaEye, FaEdit, FaTrash } from "react-icons/fa";
-import { Edit, Edit2, Eye, Trash2 } from "lucide-react";
+import { Edit2, Eye, Trash2 } from "lucide-react";
 
 // Assume token is stored in localStorage after login
 const token = localStorage.getItem("token"); // Adjust based on your auth setup
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 function Monuments() {
   const [monuments, setMonuments] = useState([]);
@@ -23,7 +23,7 @@ function Monuments() {
 
   const fetchMonuments = async () => {
     setLoading(true);
-    let url = `https://sabhyata.onrender.com/api/admin/monuments?page=${page}&limit=${limit}`;
+    let url = `${API_BASE_URL}/admin/monuments?page=${page}&limit=${limit}`;
     if (search) url += `&search=${encodeURIComponent(search)}`;
     if (status) url += `&status=${status}`;
 
@@ -65,7 +65,7 @@ function Monuments() {
   const confirmDelete = async () => {
     try {
       const res = await fetch(
-        `https://sabhyata.onrender.com/api/admin/monuments/${deleteId}`,
+        `${API_BASE_URL}/admin/monuments/${deleteId}`,
         {
           method: "DELETE",
           headers: {

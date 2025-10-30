@@ -67,8 +67,8 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Restrict manual login to admins only
-    if (user.role !== 'admin') {
+    // Restrict manual login to admins and sub-admins only
+    if (user.role !== 'admin' && user.role !== 'sub-admin') {
       return res.status(401).json({
         success: false,
         message: 'Please use Google or phone to login'
